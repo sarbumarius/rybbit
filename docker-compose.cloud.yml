@@ -6,14 +6,14 @@ services:
     ports:
       - "80:80"
       - "443:443"
-      - "443:443/udp" # Needed for HTTP/3
+      - "443:443/udp"
+    configs:
+      - source: caddyfile_config   # folosim configs, nu volumes
+        target: /etc/caddy/Caddyfile
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile # Mount Caddy config file
-      - caddy_data:/data # Mount persistent data volume for certs etc.
-      - caddy_config:/config # Mount persistent config volume
+      - caddy_data:/data
+      - caddy_config:/config
     environment:
-      # Pass domain name for use in Caddyfile
-      # Email is configured via Caddyfile global options
       - DOMAIN_NAME=${DOMAIN_NAME}
     depends_on:
       - backend
@@ -153,6 +153,34 @@ volumes:
   caddy_config: # Persistent volume for Caddy's configuration cache (optional but good practice)
 
 configs:
+  caddyfile_config:
+    content: |
+      {
+          email you@example.com
+      }
+
+      {$DOMAIN_NAME} {
+          encode zstd gzip
+
+          request_body {
+              max_size 10MB
+          }
+
+          handle /api/* {
+              reverse_proxy backend:3001
+          }
+
+          handle {
+              reverse_proxy client:3002
+          }
+
+          header {
+              Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+              X-Content-Type-Options "nosniff"
+              X-Frame-Options "DENY"
+              Referrer-Policy "strict-origin-when-cross-origin"
+          }
+      }
   clickhouse_network:
     content: |
       <clickhouse>
