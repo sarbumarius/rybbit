@@ -1,93 +1,144 @@
 services:
   clickhouse:
-    image: clickhouse/clickhouse-server:25.4.2
+    container_name: clickhouse
+    image: 'clickhouse/clickhouse-server:25.4.2'
     volumes:
-      - clickhouse-data:/var/lib/clickhouse
+      - 'clickhouse-data:/var/lib/clickhouse'
+    configs:
+      -
+        source: clickhouse_network
+        target: /etc/clickhouse-server/config.d/network.xml
+      -
+        source: clickhouse_json
+        target: /etc/clickhouse-server/config.d/enable_json.xml
+      -
+        source: clickhouse_logging
+        target: /etc/clickhouse-server/config.d/logging_rules.xml
+      -
+        source: clickhouse_user_logging
+        target: /etc/clickhouse-server/config.d/user_logging.xml
     environment:
-      - CLICKHOUSE_DB=${CLICKHOUSE_DB:-analytics}
-      - CLICKHOUSE_USER=${CLICKHOUSE_USER:-default}
-      - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD:-frog}
+      - 'CLICKHOUSE_DB=${CLICKHOUSE_DB:-analytics}'
+      - 'CLICKHOUSE_USER=${CLICKHOUSE_USER:-default}'
+      - 'CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD:-frog}'
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8123/ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      test:
+        - CMD
+        - wget
+        - '--no-verbose'
+        - '--tries=1'
+        - '--spider'
+        - 'http://localhost:8123/ping'
+      interval: 3s
+      timeout: 5s
+      retries: 5
       start_period: 10s
     restart: unless-stopped
-
+    labels:
+      - traefik.enable=false
   postgres:
-    image: postgres:17.4
+    image: 'postgres:17.4'
+    container_name: postgres
     environment:
-      - POSTGRES_USER=${POSTGRES_USER:-frog}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-frog}
-      - POSTGRES_DB=${POSTGRES_DB:-analytics}
+      - 'POSTGRES_USER=${POSTGRES_USER:-frog}'
+      - 'POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-frog}'
+      - 'POSTGRES_DB=${POSTGRES_DB:-analytics}'
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - 'postgres-data:/var/lib/postgresql/data'
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      test:
+        - CMD-SHELL
+        - 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}'
+      interval: 3s
+      timeout: 5s
+      retries: 5
       start_period: 10s
     restart: unless-stopped
-
-  redis:
-    image: redis:7-alpine
-    volumes:
-      - redis-data:/data
-    restart: unless-stopped
-    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:-changeme}", "--appendonly", "yes"]
-    healthcheck:
-      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
-
+    labels:
+      - traefik.enable=false
   backend:
-    build:
-      context: .
-      dockerfile: ./server/Dockerfile
+    image: 'ghcr.io/rybbit-io/rybbit-backend:${IMAGE_TAG:-latest}'
+    container_name: backend
     environment:
       - NODE_ENV=production
-      - CLICKHOUSE_HOST=http://clickhouse:8123
+      - 'CLICKHOUSE_HOST=http://clickhouse:8123'
+      - 'CLICKHOUSE_DB=${CLICKHOUSE_DB:-analytics}'
+      - 'CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD:-frog}'
       - POSTGRES_HOST=postgres
-      - REDIS_HOST=redis
-      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
-      - BASE_URL=${BASE_URL}
-
-
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/api/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
-      # ... other environment variables
+      - POSTGRES_PORT=5432
+      - 'POSTGRES_DB=${POSTGRES_DB:-analytics}'
+      - 'POSTGRES_USER=${POSTGRES_USER:-frog}'
+      - 'POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-frog}'
+      - 'BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}'
+      - 'BASE_URL=${BASE_URL}'
+      - 'DOMAIN_NAME=${DOMAIN_NAME}'
+      - 'DISABLE_SIGNUP=${DISABLE_SIGNUP}'
+      - 'DISABLE_TELEMETRY=${DISABLE_TELEMETRY}'
     depends_on:
       clickhouse:
         condition: service_healthy
       postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+        condition: service_started
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - '--no-verbose'
+        - '--tries=1'
+        - '--spider'
+        - 'http://127.0.0.1:3001/api/health'
+      interval: 3s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     restart: unless-stopped
-
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=coolify
+      - traefik.http.routers.rybbit-backend.entrypoints=https
+      - traefik.http.routers.rybbit-backend.tls=true
+      - 'traefik.http.routers.rybbit-backend.rule=Host(`${DOMAIN_NAME}`) && PathPrefix(`/api`)'
+      - traefik.http.services.rybbit-backend.loadbalancer.server.port=3001
+      - traefik.http.routers.rybbit-backend.priority=100
+      - traefik.http.middlewares.rybbit-forward-headers.headers.customrequestheaders.X-Forwarded-Proto=https
+      - 'traefik.http.middlewares.rybbit-forward-headers.headers.customrequestheaders.X-Forwarded-Host=${DOMAIN_NAME}'
+      - traefik.http.routers.rybbit-backend.middlewares=rybbit-forward-headers
   client:
     build:
-      context: .
+      context: .                 # rădăcina repo-ului (unde ai folderul `client/` și `shared/`)
       dockerfile: ./client/Dockerfile
       args:
-        NEXT_PUBLIC_BACKEND_URL: ${NEXT_PUBLIC_BACKEND_URL}
+        NEXT_PUBLIC_BACKEND_URL: ${BASE_URL}
+        NEXT_PUBLIC_DISABLE_SIGNUP: ${DISABLE_SIGNUP}
+        NEXT_PUBLIC_CLOUD: ${NEXT_PUBLIC_CLOUD}
+    container_name: client
     environment:
       - NODE_ENV=production
       - NEXT_PUBLIC_BACKEND_URL=${NEXT_PUBLIC_BACKEND_URL}
+      - NEXT_PUBLIC_DISABLE_SIGNUP=${DISABLE_SIGNUP}
+      - DOMAIN_NAME=${DOMAIN_NAME}
     depends_on:
-      backend:
-        condition: service_healthy
+      - backend
     restart: unless-stopped
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=coolify
+      - traefik.http.routers.rybbit-client.entrypoints=https
+      - traefik.http.routers.rybbit-client.tls=true
+      - 'traefik.http.routers.rybbit-client.rule=Host(`${DOMAIN_NAME}`)'
+      - traefik.http.services.rybbit-client.loadbalancer.server.port=3002
+      - traefik.http.routers.rybbit-client.priority=10
 
 volumes:
-  clickhouse-data:
-  postgres-data:
-  redis-data:
+  clickhouse-data: null
+  postgres-data: null
+  redis-data: null
+configs:
+  clickhouse_network:
+    content: "<clickhouse>\n    <listen_host>0.0.0.0</listen_host>\n</clickhouse>\n"
+  clickhouse_json:
+    content: "<clickhouse>\n    <settings>\n        <enable_json_type>1</enable_json_type>\n    </settings>\n</clickhouse>\n"
+  clickhouse_logging:
+    content: "<clickhouse>\n  <logger>\n      <level>warning</level>\n      <console>true</console>\n  </logger>\n  <query_thread_log remove=\"remove\"/>\n  <query_log remove=\"remove\"/>\n  <text_log remove=\"remove\"/>\n  <trace_log remove=\"remove\"/>\n  <metric_log remove=\"remove\"/>\n  <asynchronous_metric_log remove=\"remove\"/>\n  <session_log remove=\"remove\"/>\n  <part_log remove=\"remove\"/>\n  <latency_log remove=\"remove\"/>\n  <processors_profile_log remove=\"remove\"/>\n</clickhouse>\n"
+  clickhouse_user_logging:
+    content: "<clickhouse>\n  <profiles>\n    <default>\n      <log_queries>0</log_queries>\n      <log_query_threads>0</log_query_threads>\n      <log_processors_profiles>0</log_processors_profiles>\n    </default>\n  </profiles>\n</clickhouse>"
