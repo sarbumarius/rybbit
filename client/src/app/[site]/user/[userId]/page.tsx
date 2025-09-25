@@ -96,7 +96,7 @@ export default function UserPage() {
                 </div>
               ) : (
                 // Actual user info data
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 md:grid-cols-1 gap-6">
                   <div className="grid grid-cols-[100px_auto] gap-2">
                     <span className="text-neutral-100">Country:</span>
                     <div className="text-neutral-300 flex gap-1 items-center">
@@ -138,7 +138,7 @@ export default function UserPage() {
                 </div>
               )}
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 justify-between">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 gap-3 justify-between">
               {isLoading ? (
                 // Skeleton loading state
                 <>
