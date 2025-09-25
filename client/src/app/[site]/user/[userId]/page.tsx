@@ -50,13 +50,14 @@ export default function UserPage() {
 
   return (
     <div className="p-2 md:p-4 mx-auto">
-      <Button onClick={handleBackClick} className="w-full sm:w-max mb-3">
-        <ArrowLeft className="h-4 w-4" />
-        Back to Users
-      </Button>
-      <div className="grid grid-cols-1 lg:grid-cols-[20%_80%] gap-4 h-[calc(100vh-160px)]">
+
+      <div className="grid grid-cols-1 lg:grid-cols-[20%_80%] gap-4 h-[calc(100vh-66px)]">
         {/* Left column (30%) */}
         <div className="flex flex-col gap-3 overflow-y-auto pr-1">
+          <Button onClick={handleBackClick} className="w-full sm:w-max mb-3">
+            <ArrowLeft className="h-4 w-4" />
+            Back to Users
+          </Button>
           <div className="mb-1">
             <h1 className="mb-3 flex items-center gap-2 justify-between">
               <div className="text-2xl font-bold flex items-center gap-2">
