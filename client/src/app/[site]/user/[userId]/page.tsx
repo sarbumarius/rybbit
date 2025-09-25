@@ -54,7 +54,7 @@ export default function UserPage() {
         <ArrowLeft className="h-4 w-4" />
         Back to Users
       </Button>
-      <div className="grid grid-cols-1 lg:grid-cols-[30%_70%] gap-4 h-[calc(100vh-160px)]">
+      <div className="grid grid-cols-1 lg:grid-cols-[20%_80%] gap-4 h-[calc(100vh-160px)]">
         {/* Left column (30%) */}
         <div className="flex flex-col gap-3 overflow-y-auto pr-1">
           <div className="mb-1">
@@ -138,7 +138,7 @@ export default function UserPage() {
                 </div>
               )}
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 gap-3 justify-between">
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-2 gap-3 justify-between">
               {isLoading ? (
                 // Skeleton loading state
                 <>
