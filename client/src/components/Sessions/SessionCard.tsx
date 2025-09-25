@@ -39,7 +39,7 @@ function truncatePath(path: string, maxLength: number = 32) {
   return `${path.substring(0, maxLength)}...`;
 }
 
-export function SessionCard({ session, onClick, userId, initiallyExpanded }: SessionCardProps) {
+export function SessionCard({ session, onClick, userId, initiallyExpanded = true }: SessionCardProps) {
   const [expanded, setExpanded] = useState(!!initiallyExpanded);
 
   // Calculate session duration in minutes
