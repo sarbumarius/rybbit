@@ -18,7 +18,7 @@ import {
 import { DateTime } from "luxon";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { memo, useMemo } from "react";
+import { memo, useMemo, useState } from "react";
 import { GetSessionsResponse, SessionEvent, useGetSessionDetailsInfinite } from "../../api/analytics/userSessions";
 import { Browser } from "../../app/[site]/components/shared/icons/Browser";
 import { CountryFlag } from "../../app/[site]/components/shared/icons/CountryFlag";
@@ -303,6 +303,19 @@ export function SessionDetails({ session, userId }: SessionDetailsProps) {
     return sessionDetailsData.pages.flatMap(page => page.data?.events || []);
   }, [sessionDetailsData?.pages]);
 
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+
+  // Events sorted for display based on selected order
+  const displayEvents = useMemo(() => {
+    const events = [...allEvents];
+    events.sort((a, b) => {
+      const ta = DateTime.fromSQL(a.timestamp, { zone: "utc" }).toMillis();
+      const tb = DateTime.fromSQL(b.timestamp, { zone: "utc" }).toMillis();
+      return sortOrder === "asc" ? ta - tb : tb - ta;
+    });
+    return events;
+  }, [allEvents, sortOrder]);
+
   // Get session details from the first page
   const sessionDetails = sessionDetailsData?.pages[0]?.data?.session;
 
@@ -351,14 +364,30 @@ export function SessionDetails({ session, userId }: SessionDetailsProps) {
 
           <TabsContent value="timeline" className="mt-4">
             <div className="mb-4 px-1">
-              {allEvents.map((pageview: SessionEvent, index: number) => {
-                // Determine the next timestamp for duration calculation
-                // For the last item, use the session end time
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-xs text-neutral-400">Sort:</span>
+                <Button size={"sm"} variant={sortOrder === "desc" ? "default" : "outline"} onClick={() => setSortOrder("desc")}>
+                  Newest first
+                </Button>
+                <Button size={"sm"} variant={sortOrder === "asc" ? "default" : "outline"} onClick={() => setSortOrder("asc")}>
+                  Oldest first
+                </Button>
+              </div>
+              {displayEvents.map((pageview: SessionEvent, index: number) => {
+                // Determine the next timestamp for duration calculation based on sort order
                 let nextTimestamp;
-                if (index < allEvents.length - 1) {
-                  nextTimestamp = allEvents[index + 1].timestamp;
-                } else if (sessionDetails) {
-                  nextTimestamp = sessionDetails.session_end;
+                if (sortOrder === "asc") {
+                  if (index < displayEvents.length - 1) {
+                    nextTimestamp = displayEvents[index + 1].timestamp;
+                  } else if (sessionDetails) {
+                    nextTimestamp = sessionDetails.session_end;
+                  }
+                } else {
+                  if (index > 0) {
+                    nextTimestamp = displayEvents[index - 1].timestamp;
+                  } else if (sessionDetails) {
+                    nextTimestamp = sessionDetails.session_end;
+                  }
                 }
 
                 return (
@@ -366,7 +395,7 @@ export function SessionDetails({ session, userId }: SessionDetailsProps) {
                     key={`${pageview.timestamp}-${index}`}
                     item={pageview}
                     index={index}
-                    isLast={index === allEvents.length - 1 && !hasNextPage}
+                    isLast={index === displayEvents.length - 1 && !hasNextPage}
                     nextTimestamp={nextTimestamp}
                   />
                 );
