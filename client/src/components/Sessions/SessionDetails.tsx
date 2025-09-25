@@ -37,11 +37,13 @@ function PageviewItem({
                         index,
                         isLast = false,
                         nextTimestamp,
+                        displayNumber,
                       }: {
   item: SessionEvent;
   index: number;
   isLast?: boolean;
   nextTimestamp?: string; // Timestamp of the next event for duration calculation
+  displayNumber?: number;
 }) {
   const isError = item.type === "error";
   const isEvent = item.type === "custom_event";
@@ -83,7 +85,7 @@ function PageviewItem({
                   : "bg-blue-900/30 border-blue-500/50"
           )}
         >
-          <span className="text-sm font-medium">{index + 1}</span>
+          <span className="text-sm font-medium">{displayNumber ?? index + 1}</span>
         </div>
       </div>
 
@@ -347,7 +349,7 @@ export function SessionDetails({ session, userId }: SessionDetailsProps) {
           <AlertDescription>Error loading session details. Please try again.</AlertDescription>
         </Alert>
       ) : sessionDetailsData?.pages[0]?.data ? (
-        <Tabs defaultValue="timeline" className="mt-4">
+        <Tabs defaultValue="timeline" className="mt-4 relative">
           <div className="flex justify-between items-center mb-6">
             <TabsList className="bg-neutral-800">
               <TabsTrigger value="timeline">Timeline</TabsTrigger>
@@ -362,9 +364,9 @@ export function SessionDetails({ session, userId }: SessionDetailsProps) {
             )}
           </div>
 
-          <TabsContent value="timeline" className="mt-4">
+          <TabsContent value="timeline" className="mt-4 ">
             <div className="mb-4 px-1">
-              <div className="flex items-center gap-2 mb-3">
+              <div className="flex items-center gap-2 mb-3 absolute right-0 top-0">
                 <span className="text-xs text-neutral-400">Sort:</span>
                 <Button size={"sm"} variant={sortOrder === "desc" ? "default" : "outline"} onClick={() => setSortOrder("desc")}>
                   Newest first
@@ -390,6 +392,7 @@ export function SessionDetails({ session, userId }: SessionDetailsProps) {
                   }
                 }
 
+                const displayNumber = sortOrder === "asc" ? index + 1 : displayEvents.length - index;
                 return (
                   <PageviewItem
                     key={`${pageview.timestamp}-${index}`}
@@ -397,6 +400,7 @@ export function SessionDetails({ session, userId }: SessionDetailsProps) {
                     index={index}
                     isLast={index === displayEvents.length - 1 && !hasNextPage}
                     nextTimestamp={nextTimestamp}
+                    displayNumber={displayNumber}
                   />
                 );
               })}
