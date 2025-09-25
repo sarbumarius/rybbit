@@ -1,12 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useGetEventsInfinite } from "../../../../api/analytics/events/useGetEvents";
 import { NothingFound } from "../../../../components/NothingFound";
 import { formatter } from "../../../../lib/utils";
 import { EventLogItem, EventLogItemSkeleton } from "./EventLogItem";
 
-export function EventLog() {
+export function EventLog({ searchQuery = "" }: { searchQuery?: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const loadMoreRef = useRef<HTMLDivElement>(null);
 
@@ -46,6 +46,27 @@ export function EventLog() {
   // Flatten all pages of data
   const allEvents = data?.pages.flatMap(page => page.data) || [];
 
+  // Apply client-side filtering based on searchQuery over multiple fields
+  const filteredEvents = useMemo(() => {
+    const q = (searchQuery || "").trim().toLowerCase();
+    if (!q) return allEvents;
+
+    return allEvents.filter(e => {
+      const parts: string[] = [];
+      if (e.type) parts.push(e.type);
+      if (e.event_name) parts.push(e.event_name);
+      if (e.pathname) parts.push(e.pathname);
+      if (e.querystring) parts.push(e.querystring);
+      if (e.hostname) parts.push(e.hostname);
+      if (e.page_title) parts.push(e.page_title);
+      if (e.referrer) parts.push(e.referrer);
+      if (e.user_id) parts.push(e.user_id);
+      if (e.properties) parts.push(e.properties); // properties is JSON string, include raw for substring match (e.g., url)
+
+      return parts.some(p => p.toLowerCase().includes(q));
+    });
+  }, [allEvents, searchQuery]);
+
   if (isLoading) {
     return (
       <div className="space-y-2">
@@ -64,11 +85,15 @@ export function EventLog() {
     return <NothingFound title={"No events found"} description={"Try a different date range or filter"} />;
   }
 
+  if (filteredEvents.length === 0 && searchQuery.trim()) {
+    return <NothingFound title={"No matching events"} description={"Try a different search term"} />;
+  }
+
   return (
     <div className="space-y-1">
       {/* Event list */}
       <div ref={containerRef} className="max-h-[80vh] overflow-y-auto pr-2">
-        {allEvents.map((event, index) => (
+        {filteredEvents.map((event, index) => (
           <EventLogItem key={`${event.timestamp}-${index}`} event={event} />
         ))}
 
@@ -87,7 +112,7 @@ export function EventLog() {
       {/* Pagination info */}
       {data?.pages[0]?.pagination && (
         <div className="text-center text-xs text-neutral-400 pt-2">
-          Showing {allEvents.length} of {formatter(data.pages[0].pagination.total)} events
+          Showing {filteredEvents.length} of {formatter(data.pages[0].pagination.total)} events
         </div>
       )}
     </div>

@@ -28,6 +28,9 @@ export default function EventsPage() {
     return list.filter(e => e.eventName.toLowerCase().includes(q));
   }, [eventNamesData, eventSearch]);
 
+  // Local search for Event Log
+  const [eventLogSearch, setEventLogSearch] = useState("");
+
   return (
     <DisabledOverlay message="Events" featurePath="events">
       <div className="p-2 md:p-4 max-w-[1300px] mx-auto space-y-3">
@@ -71,10 +74,19 @@ export default function EventsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Event Log</CardTitle>
+            <div className="flex items-center justify-between gap-2">
+              <CardTitle>Event Log</CardTitle>
+              <Input
+                inputSize="sm"
+                value={eventLogSearch}
+                onChange={e => setEventLogSearch(e.target.value)}
+                placeholder="Search path, link, action..."
+                className="h-8 w-40 md:w-60"
+              />
+            </div>
           </CardHeader>
           <CardContent>
-            <EventLog />
+            <EventLog searchQuery={eventLogSearch} />
           </CardContent>
         </Card>
       </div>
