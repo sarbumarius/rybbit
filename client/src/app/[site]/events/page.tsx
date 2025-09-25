@@ -34,7 +34,7 @@ export default function EventsPage() {
         <SubHeader availableFilters={EVENT_FILTERS} />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-stretch">
-          <Card className="h-[200px] flex flex-col overflow-hidden">
+          <div className="relative rounded-lg border h-[200px]  border-neutral-200 bg-white text-neutral-950 dark:border-neutral-850 dark:bg-neutral-900 dark:text-neutral-50 overflow-hidden transition-all duration-300 flex flex-col overflow-hidden">
             <CardHeader>
               <div className="flex items-center justify-between gap-2">
                 <CardTitle>Custom Events</CardTitle>
@@ -51,7 +51,7 @@ export default function EventsPage() {
             <CardContent className="flex-1 overflow-auto">
               <EventList events={filteredEvents} isLoading={isLoadingEventNames} size="large" />
             </CardContent>
-          </Card>
+          </div>
 
           <Card className="h-auto lg:h-full lg:min-h-0 flex flex-col overflow-hidden lg:[contain:size]">
             <CardHeader>
