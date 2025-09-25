@@ -197,5 +197,6 @@ export function useGetUserSessionCount(userId: string) {
       });
     },
     staleTime: Infinity,
+    refetchInterval: 3000,
   });
 }

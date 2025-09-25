@@ -29,5 +29,6 @@ export function useUserInfo(siteId: number, userId: string) {
       const response = await authedFetch<{ data: UserInfo }>(`/user/info/${userId}/${siteId}`);
       return response.data;
     },
+    refetchInterval: 3000,
   });
 }

@@ -33,11 +33,11 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 
 // Component to display a single pageview or event
 function PageviewItem({
-  item,
-  index,
-  isLast = false,
-  nextTimestamp,
-}: {
+                        item,
+                        index,
+                        isLast = false,
+                        nextTimestamp,
+                      }: {
   item: SessionEvent;
   index: number;
   isLast?: boolean;

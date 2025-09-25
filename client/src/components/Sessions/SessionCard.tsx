@@ -27,6 +27,7 @@ interface SessionCardProps {
   session: GetSessionsResponse[number];
   userId?: string;
   onClick?: () => void;
+  initiallyExpanded?: boolean;
 }
 
 // Function to truncate path for display
@@ -38,8 +39,8 @@ function truncatePath(path: string, maxLength: number = 32) {
   return `${path.substring(0, maxLength)}...`;
 }
 
-export function SessionCard({ session, onClick, userId }: SessionCardProps) {
-  const [expanded, setExpanded] = useState(false);
+export function SessionCard({ session, onClick, userId, initiallyExpanded }: SessionCardProps) {
+  const [expanded, setExpanded] = useState(!!initiallyExpanded);
 
   // Calculate session duration in minutes
   const start = DateTime.fromSQL(session.session_start);

@@ -5,9 +5,9 @@ import { Button } from "../ui/button";
 import { NothingFound } from "../NothingFound";
 import { Rewind } from "lucide-react";
 
-export default function SessionsList({ userId }: { userId?: string }) {
+export default function SessionsList({ userId, initiallyExpanded = false }: { userId?: string; initiallyExpanded?: boolean }) {
   // Get sessions data with infinite loading
-  const { data, isLoading, error, fetchNextPage, hasNextPage, isFetchingNextPage } = useGetSessionsInfinite(userId);
+  const { data, isLoading, error, fetchNextPage, hasNextPage, isFetchingNextPage, refetch } = useGetSessionsInfinite(userId) as any;
 
   // Combine all pages of data
   const flattenedData = useMemo(() => {
@@ -17,6 +17,40 @@ export default function SessionsList({ userId }: { userId?: string }) {
 
   // Reference for the scroll container
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Auto-refresh every 3 seconds
+  useEffect(() => {
+    let timer: any;
+    const start = () => {
+      // Only refetch when the tab is visible to avoid unnecessary calls
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        refetch?.();
+      }
+      timer = setInterval(() => {
+        if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+          refetch?.();
+        }
+      }, 3000);
+    };
+
+    start();
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        refetch?.();
+      }
+    };
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', onVisibilityChange);
+    }
+
+    return () => {
+      if (timer) clearInterval(timer);
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', onVisibilityChange);
+      }
+    };
+  }, [refetch]);
 
   if (error) return <div className="text-red-500 p-4">Error: {(error as Error).message}</div>;
 
@@ -34,7 +68,7 @@ export default function SessionsList({ userId }: { userId?: string }) {
       ) : (
         // Render session cards with more robust key generation
         flattenedData.map((session, index) => (
-          <SessionCard key={`${session.session_id}-${index}`} session={session} userId={userId} />
+          <SessionCard key={`${session.session_id}-${index}`} session={session} userId={userId} initiallyExpanded={initiallyExpanded} />
         ))
       )}
 
