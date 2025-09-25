@@ -1,6 +1,7 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { EVENT_FILTERS } from "@/lib/store";
 import { useGetEventNames } from "../../../api/analytics/events/useGetEventNames";
 import { useGetOutboundLinks } from "../../../api/analytics/events/useGetOutboundLinks";
@@ -10,6 +11,7 @@ import { SubHeader } from "../components/SubHeader/SubHeader";
 import { EventList } from "./components/EventList";
 import { EventLog } from "./components/EventLog";
 import { OutboundLinksList } from "./components/OutboundLinksList";
+import { useMemo, useState } from "react";
 
 export default function EventsPage() {
   useSetPageTitle("Rybbit · Events");
@@ -17,18 +19,37 @@ export default function EventsPage() {
   const { data: eventNamesData, isLoading: isLoadingEventNames } = useGetEventNames();
   const { data: outboundLinksData, isLoading: isLoadingOutboundLinks } = useGetOutboundLinks();
 
+  // Local search for Custom Events
+  const [eventSearch, setEventSearch] = useState("");
+  const filteredEvents = useMemo(() => {
+    const list = eventNamesData || [];
+    if (!eventSearch.trim()) return list;
+    const q = eventSearch.toLowerCase();
+    return list.filter(e => e.eventName.toLowerCase().includes(q));
+  }, [eventNamesData, eventSearch]);
+
   return (
     <DisabledOverlay message="Events" featurePath="events">
       <div className="p-2 md:p-4 max-w-[1300px] mx-auto space-y-3">
         <SubHeader availableFilters={EVENT_FILTERS} />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-stretch">
-          <Card className="h-auto lg:h-full">
+          <Card className="h-[200px] flex flex-col overflow-hidden">
             <CardHeader>
-              <CardTitle>Custom Events</CardTitle>
+              <div className="flex items-center justify-between gap-2">
+                <CardTitle>Custom Events</CardTitle>
+                <Input
+                  inputSize="sm"
+                  value={eventSearch}
+                  onChange={e => setEventSearch(e.target.value)}
+                  placeholder="Search..."
+                  className="h-8 w-40 md:w-60"
+                  disabled={isLoadingEventNames}
+                />
+              </div>
             </CardHeader>
-            <CardContent>
-              <EventList events={eventNamesData || []} isLoading={isLoadingEventNames} size="large" />
+            <CardContent className="flex-1 overflow-auto">
+              <EventList events={filteredEvents} isLoading={isLoadingEventNames} size="large" />
             </CardContent>
           </Card>
 
