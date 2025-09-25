@@ -66,10 +66,14 @@ export default function SessionsList({ userId, initiallyExpanded = false }: { us
           description={"Try a different date range or filter"}
         />
       ) : (
-        // Render session cards with more robust key generation
+
         flattenedData.map((session, index) => (
-          <SessionCard key={`${session.session_id}-${index}`} session={session} userId={userId} initiallyExpanded={initiallyExpanded} />
+          <SessionCard key={`${session.session_id}-${index}`} session={session} userId={userId} />
         ))
+
+
+
+
       )}
 
       {isFetchingNextPage && (
