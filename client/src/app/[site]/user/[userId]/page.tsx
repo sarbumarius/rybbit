@@ -221,7 +221,7 @@ export default function UserPage() {
         {/* Right column (70%) */}
         <div className="flex flex-col overflow-y-auto pl-1">
           <h2 className="text-lg font-bold mb-4">Sessions</h2>
-          <SessionsList userId={userId as string} initiallyExpanded />
+          <SessionsList userId={userId as string}  />
         </div>
       </div>
     </div>
