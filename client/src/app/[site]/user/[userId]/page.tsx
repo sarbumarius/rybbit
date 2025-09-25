@@ -54,7 +54,7 @@ export default function UserPage() {
       <div className="grid grid-cols-1 lg:grid-cols-[20%_80%] gap-4 h-[calc(100vh-20px)]">
         {/* Left column (30%) */}
         <div className="flex flex-col gap-3 overflow-y-auto pr-1">
-          <Button onClick={handleBackClick} className="w-full sm:w-max mb-3">
+          <Button onClick={handleBackClick} className="w-full  mb-3">
             <ArrowLeft className="h-4 w-4" />
             Back to Users
           </Button>
