@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from "react";
-import { useGetSessionsInfinite } from "../../api/analytics/userSessions";
+import { useGetSessionsInfinite, GetSessionsResponse } from "../../api/analytics/userSessions";
 import { SessionCard, SessionCardSkeleton } from "./SessionCard";
 import { Button } from "../ui/button";
 import { NothingFound } from "../NothingFound";
@@ -12,7 +12,7 @@ export default function SessionsList({ userId, initiallyExpanded = false }: { us
   // Combine all pages of data
   const flattenedData = useMemo(() => {
     if (!data) return [];
-    return data.pages.flatMap(page => page.data || []);
+    return data.pages.flatMap((page: { data?: GetSessionsResponse }) => page.data || []);
   }, [data]);
 
   // Reference for the scroll container
