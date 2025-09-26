@@ -80,7 +80,7 @@ export default function SessionsList({ userId }: { userId?: string }) {
             onChange={e => setSessionSearch(e.target.value)}
             placeholder="Search actions and pages..."
             className="h-8 w-full"
-          />
+          />dwada
         </div>
 
         {flattenedData.map((session, index) => (
