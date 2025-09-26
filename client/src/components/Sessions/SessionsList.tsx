@@ -8,6 +8,9 @@ import { SessionDetails } from "./SessionDetails";
 import { Input } from "../ui/input";
 
 export default function SessionsList({ userId }: { userId?: string }) {
+  // Local search for actions and pages (applies to details view)
+  const [sessionSearch, setSessionSearch] = useState("");
+
   // Get sessions data with infinite loading
   const { data, isLoading, error, fetchNextPage, hasNextPage, isFetchingNextPage } = useGetSessionsInfinite(userId, sessionSearch);
 
@@ -16,9 +19,6 @@ export default function SessionsList({ userId }: { userId?: string }) {
     if (!data) return [] as GetSessionsResponse;
     return data.pages.flatMap(page => page.data || []);
   }, [data]);
-
-  // Local search for actions and pages (applies to details view)
-  const [sessionSearch, setSessionSearch] = useState("");
 
   // Selection state: default to latest session when data arrives
   const [selectedId, setSelectedId] = useState<string | null>(null);
