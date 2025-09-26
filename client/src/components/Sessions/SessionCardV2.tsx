@@ -13,7 +13,12 @@ interface SessionCardV2Props {
 
 export function SessionCardV2({ session, selected = false, onSelect }: SessionCardV2Props) {
   const start = DateTime.fromSQL(session.session_start, { zone: "utc" }).toLocal();
-  const label = start.setLocale(userLocale).toFormat(hour12 ? "MMM d, h:mm a" : "dd MMM, HH:mm");
+  const now = DateTime.local();
+  const diffMinutes = now.diff(start, "minutes").as("minutes");
+  const label =
+    diffMinutes >= 0 && diffMinutes < 60
+      ? `acum ${Math.max(1, Math.floor(diffMinutes))} min`
+      : start.setLocale(userLocale).toFormat(hour12 ? "MMM d, h:mm a" : "dd MMM, HH:mm");
 
   return (
     <button
@@ -28,15 +33,21 @@ export function SessionCardV2({ session, selected = false, onSelect }: SessionCa
       title={`${session.user_id}`}
     >
       <div className="flex items-center gap-2">
-        <span className="text-[10px] font-mono text-neutral-400 hidden xl:inline">{session.user_id.slice(0, 12)}</span>
-        <span className="text-xs text-neutral-300 truncate">{label}</span>
+        <span className="text-md font-mono text-neutral-400 hidden xl:inline">{session.user_id.slice(0, 12)}</span>
       </div>
+        <div className="flex items-center gap-2">
+            <span className="text-xs text-neutral-300 truncate">{label}</span>
+        </div>
       {/* City and Screen */}
-      <div className="mt-1 text-[10px] text-neutral-400 flex items-center gap-2">
+      <div className="mt-1 text-[10px] text-neutral-400 grid grid-cols-1 gap-2">
+
+
+          {session.ip ? <div className="truncate text-md" title={session.ip}>{session.ip}</div> : null}
+
         {session.city ? <span className="truncate" title={session.city}>{session.city}</span> : null}
-        {session.screen_width && session.screen_height ? (
-          <span className="text-neutral-500">•</span>
-        ) : null}
+        {/*{session.screen_width && session.screen_height ? (*/}
+        {/*  <span className="text-neutral-500">•</span>*/}
+        {/*) : null}*/}
         {session.screen_width && session.screen_height ? (
           <span>
             {session.screen_width} × {session.screen_height}

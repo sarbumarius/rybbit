@@ -1,0 +1,16 @@
+services:
+  client:
+    build:
+      context: .
+      dockerfile: client/Dockerfile.dev
+    command: npm run dev
+    working_dir: /usr/src/app/client
+    volumes:
+      - ./client:/usr/src/app/client
+      - /usr/src/app/client/node_modules
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_BACKEND_URL=${BASE_URL}
+      - NEXT_PUBLIC_DISABLE_SIGNUP=${DISABLE_SIGNUP}
+    ports:
+      - "3003:3002"

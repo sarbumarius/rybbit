@@ -120,18 +120,20 @@ function SidebarContent() {
           icon={<ChartColumnDecreasing className="w-4 h-4" />}
         />
         <SidebarComponents.SectionHeader>Behavior</SidebarComponents.SectionHeader>
+          <SidebarComponents.Item
+              label="Users"
+              active={isActiveTab("users")}
+              href={getTabPath("users")}
+              icon={<User className="w-4 h-4" />}
+          />
+          
         <SidebarComponents.Item
           label="Sessions"
           active={isActiveTab("sessions")}
           href={getTabPath("sessions")}
           icon={<Rewind className="w-4 h-4" />}
         />
-        <SidebarComponents.Item
-          label="Users"
-          active={isActiveTab("users")}
-          href={getTabPath("users")}
-          icon={<User className="w-4 h-4" />}
-        />
+
         <SidebarComponents.Item
           label="Events"
           active={isActiveTab("events")}

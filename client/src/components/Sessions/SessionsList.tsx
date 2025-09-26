@@ -72,16 +72,7 @@ export default function SessionsList({ userId }: { userId?: string }) {
     <div className="grid grid-cols-1 lg:grid-cols-[minmax(180px,10%)_1fr] gap-3 items-start">
       {/* Left 10% list */}
       <div className="space-y-2 max-h-[93vh] overflow-auto pr-1" ref={listRef}>
-        {/* Search input above session cards */}
-        <div className="sticky top-0 z-10 bg-neutral-900 pt-1 pb-2 pr-1">
-          <Input
-            inputSize="sm"
-            value={sessionSearch}
-            onChange={e => setSessionSearch(e.target.value)}
-            placeholder="Search actions and pages..."
-            className="h-8 w-full"
-          />dwada
-        </div>
+
 
         {flattenedData.map((session, index) => (
           <SessionCardV2
@@ -113,6 +104,13 @@ export default function SessionsList({ userId }: { userId?: string }) {
       <div className="max-h-[93vh] overflow-auto">
         {selectedSession ? (
           <div className="rounded-lg border border-neutral-800 overflow-hidden bg-neutral-900">
+            <Input
+                inputSize="sm"
+                value={sessionSearch}
+                onChange={e => setSessionSearch(e.target.value)}
+                placeholder="Search actions and pages..."
+                className="h-8 w-full"
+            />
             <SessionDetails session={selectedSession} userId={userId} searchQuery={sessionSearch} />
           </div>
         ) : (

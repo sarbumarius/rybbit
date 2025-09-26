@@ -59,7 +59,7 @@ export default function UserPage() {
             Back to Users
           </Button>
           <div className="mb-1">
-            <h1 className="mb-3 flex items-center gap-2 justify-between">
+            <h1 className="mb-3  grid-cols-1 grid items-center gap-2 justify-between">
               <div className="text-2xl font-bold flex items-center gap-2">
                 <div>
                   <MobileSidebar />

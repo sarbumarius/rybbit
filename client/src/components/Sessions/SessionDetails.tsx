@@ -372,26 +372,61 @@ export function SessionDetails({ session, userId, searchQuery }: SessionDetailsP
               <TabsTrigger value="timeline">Timeline</TabsTrigger>
               <TabsTrigger value="info">Session Info</TabsTrigger>
             </TabsList>
-            {!userId && (
-              <Link href={`/${site}/user/${session.user_id}`}>
-                <Button size={"sm"} variant={"success"}>
-                  View User <ArrowRight className="w-4 h-4" />
-                </Button>
-              </Link>
+            {!userId ? (
+
+                    <div className="flex items-center gap-2 mb-3 absolute right-0 top-0">
+                      <span className="text-xs text-neutral-400">Sort:</span>
+                      <Button
+                          size="sm"
+                          variant={sortOrder === "desc" ? "default" : "outline"}
+                          onClick={() => setSortOrder("desc")}
+                      >
+                        Newest first
+                      </Button>
+                      <Button
+                          size="sm"
+                          variant={sortOrder === "asc" ? "default" : "outline"}
+                          onClick={() => setSortOrder("asc")}
+                      >
+                        Oldest first
+                      </Button>
+                      <Link href={`/${site}/user/${session.user_id}`}>
+                        <Button size="sm" variant="success">
+                          View User <ArrowRight className="w-4 h-4" />
+                        </Button>
+                      </Link>
+
+                    </div>
+
+
+            ) : (
+                <div className="flex items-center gap-2 mb-3 absolute right-0 top-0">
+                  <span className="text-xs text-neutral-400">Sort:</span>
+                  <Button
+                      size="sm"
+                      variant={sortOrder === "desc" ? "default" : "outline"}
+                      onClick={() => setSortOrder("desc")}
+                  >
+                    Newest first
+                  </Button>
+                  <Button
+                      size="sm"
+                      variant={sortOrder === "asc" ? "default" : "outline"}
+                      onClick={() => setSortOrder("asc")}
+                  >
+                    Oldest first
+                  </Button>
+                </div>
             )}
           </div>
 
           <TabsContent value="timeline" className="mt-4 ">
             <div className="mb-4 px-1">
-              <div className="flex items-center gap-2 mb-3 absolute right-0 top-0">
-                <span className="text-xs text-neutral-400">Sort:</span>
-                <Button size={"sm"} variant={sortOrder === "desc" ? "default" : "outline"} onClick={() => setSortOrder("desc")}>
-                  Newest first
-                </Button>
-                <Button size={"sm"} variant={sortOrder === "asc" ? "default" : "outline"} onClick={() => setSortOrder("asc")}>
-                  Oldest first
-                </Button>
-              </div>
+
+
+
+
+
               {searchQuery && searchQuery.trim() && (
                 <div className="text-xs text-neutral-400 mb-2">
                   Filtering by "{searchQuery}" — showing {filteredEvents.length} of {displayEvents.length} items

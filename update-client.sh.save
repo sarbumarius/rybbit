@@ -1,0 +1,34 @@
+#!/bin/bash
+
+# Exit on first error
+set -e
+
+echo "🚀 Building fresh client image..."
+
+# Build client fără cache (ca să fie sigur că ia ultimele modificări)
+docker compose build --no-cache client
+
+echo "✅ Build finished."
+
+echo "♻️  Restarting client container..."
+docker compose up -d client
+
+echo "📜 Showing client logs..."
+docker compose logs -f client
+#!/bin/bash
+
+# Exit on first error
+set -e
+
+echo "🚀 Building fresh client image..."
+
+# Build client fără cache (ca să fie sigur că ia ultimele modificări)
+docker compose build --no-cache client
+
+echo "✅ Build finished."
+
+echo "♻️  Restarting client container..."
+docker compose up -d client
+
+echo "📜 Showing client logs..."
+docker compose logs -f client

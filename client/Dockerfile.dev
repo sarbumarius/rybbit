@@ -1,0 +1,9 @@
+FROM node:20-alpine
+
+WORKDIR /usr/src/app/client
+
+# Instalează dependențele (se face o singură dată când build-uiești containerul)
+COPY client/package.json client/package-lock.json* ./
+RUN npm ci --legacy-peer-deps
+
+# Implicit nu pornim aici nimic — docker-compose va da comanda
