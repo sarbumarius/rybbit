@@ -5,6 +5,7 @@ import { Button } from "../ui/button";
 import { NothingFound } from "../NothingFound";
 import { Rewind } from "lucide-react";
 import { SessionDetails } from "./SessionDetails";
+import { Input } from "../ui/input";
 
 export default function SessionsList({ userId }: { userId?: string }) {
   // Get sessions data with infinite loading
@@ -15,6 +16,9 @@ export default function SessionsList({ userId }: { userId?: string }) {
     if (!data) return [] as GetSessionsResponse;
     return data.pages.flatMap(page => page.data || []);
   }, [data]);
+
+  // Local search for actions and pages (applies to details view)
+  const [sessionSearch, setSessionSearch] = useState("");
 
   // Selection state: default to latest session when data arrives
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -42,12 +46,12 @@ export default function SessionsList({ userId }: { userId?: string }) {
   if (isLoading) {
     return (
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(180px,10%)_1fr] gap-3">
-        <div className="space-y-2 max-h-[80vh] overflow-auto" ref={listRef}>
+        <div className="space-y-2 max-h-[93vh] overflow-auto" ref={listRef}>
           {Array.from({ length: 10 }).map((_, i) => (
             <SessionCardV2Skeleton key={i} />
           ))}
         </div>
-        <div className="hidden lg:block border border-neutral-800 rounded-md bg-neutral-900 p-4 text-neutral-400">
+        <div className="hidden lg:block max-h-[93vh] overflow-auto border border-neutral-800 rounded-md bg-neutral-900 p-4 text-neutral-400">
           Loading session details...
         </div>
       </div>
@@ -67,7 +71,18 @@ export default function SessionsList({ userId }: { userId?: string }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[minmax(180px,10%)_1fr] gap-3 items-start">
       {/* Left 10% list */}
-      <div className="space-y-2 max-h-[80vh] overflow-auto pr-1" ref={listRef}>
+      <div className="space-y-2 max-h-[93vh] overflow-auto pr-1" ref={listRef}>
+        {/* Search input above session cards */}
+        <div className="sticky top-0 z-10 bg-neutral-900 pt-1 pb-2 pr-1">
+          <Input
+            inputSize="sm"
+            value={sessionSearch}
+            onChange={e => setSessionSearch(e.target.value)}
+            placeholder="Search actions and pages..."
+            className="h-8 w-full"
+          />
+        </div>
+
         {flattenedData.map((session, index) => (
           <SessionCardV2
             key={`${session.session_id}-${index}`}
@@ -95,10 +110,10 @@ export default function SessionsList({ userId }: { userId?: string }) {
       </div>
 
       {/* Right 90% details */}
-      <div className="min-h-[200px]">
+      <div className="max-h-[93vh] overflow-auto">
         {selectedSession ? (
           <div className="rounded-lg border border-neutral-800 overflow-hidden bg-neutral-900">
-            <SessionDetails session={selectedSession} userId={userId} />
+            <SessionDetails session={selectedSession} userId={userId} searchQuery={sessionSearch} />
           </div>
         ) : (
           <div className="rounded-lg border border-neutral-800 bg-neutral-900 p-6 text-neutral-400">

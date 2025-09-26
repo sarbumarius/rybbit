@@ -286,9 +286,10 @@ const SessionDetailsTimelineSkeleton = memo(({ itemCount }: { itemCount: number 
 interface SessionDetailsProps {
   session: GetSessionsResponse[number];
   userId?: string;
+  searchQuery?: string;
 }
 
-export function SessionDetails({ session, userId }: SessionDetailsProps) {
+export function SessionDetails({ session, userId, searchQuery }: SessionDetailsProps) {
   const {
     data: sessionDetailsData,
     isLoading,
@@ -317,6 +318,22 @@ export function SessionDetails({ session, userId }: SessionDetailsProps) {
     });
     return events;
   }, [allEvents, sortOrder]);
+
+  // Apply client-side filtering for actions and pages if searchQuery is provided
+  const filteredEvents = useMemo(() => {
+    const q = (searchQuery || "").trim().toLowerCase();
+    if (!q) return displayEvents;
+    return displayEvents.filter(item => {
+      const parts: string[] = [];
+      if (item.type) parts.push(item.type);
+      if (item.event_name) parts.push(item.event_name);
+      if (item.pathname) parts.push(item.pathname);
+      if (item.page_title) parts.push(item.page_title);
+      if (item.querystring) parts.push(item.querystring);
+      if (item.props) parts.push(JSON.stringify(item.props));
+      return parts.some(p => p.toLowerCase().includes(q));
+    });
+  }, [displayEvents, searchQuery]);
 
   // Get session details from the first page
   const sessionDetails = sessionDetailsData?.pages[0]?.data?.session;
@@ -375,30 +392,38 @@ export function SessionDetails({ session, userId }: SessionDetailsProps) {
                   Oldest first
                 </Button>
               </div>
-              {displayEvents.map((pageview: SessionEvent, index: number) => {
-                // Determine the next timestamp for duration calculation based on sort order
+              {searchQuery && searchQuery.trim() && (
+                <div className="text-xs text-neutral-400 mb-2">
+                  Filtering by "{searchQuery}" — showing {filteredEvents.length} of {displayEvents.length} items
+                </div>
+              )}
+              {filteredEvents.length === 0 && searchQuery && searchQuery.trim() ? (
+                <div className="py-6 text-center text-neutral-400">No matching actions or pages</div>
+              ) : null}
+              {filteredEvents.map((pageview: SessionEvent, index: number) => {
+                // Determine the next timestamp for duration calculation based on sort order within the filtered list
                 let nextTimestamp;
                 if (sortOrder === "asc") {
-                  if (index < displayEvents.length - 1) {
-                    nextTimestamp = displayEvents[index + 1].timestamp;
+                  if (index < filteredEvents.length - 1) {
+                    nextTimestamp = filteredEvents[index + 1].timestamp;
                   } else if (sessionDetails) {
                     nextTimestamp = sessionDetails.session_end;
                   }
                 } else {
                   if (index > 0) {
-                    nextTimestamp = displayEvents[index - 1].timestamp;
+                    nextTimestamp = filteredEvents[index - 1].timestamp;
                   } else if (sessionDetails) {
                     nextTimestamp = sessionDetails.session_end;
                   }
                 }
 
-                const displayNumber = sortOrder === "asc" ? index + 1 : displayEvents.length - index;
+                const displayNumber = sortOrder === "asc" ? index + 1 : filteredEvents.length - index;
                 return (
                   <PageviewItem
                     key={`${pageview.timestamp}-${index}`}
                     item={pageview}
                     index={index}
-                    isLast={index === displayEvents.length - 1 && !hasNextPage}
+                    isLast={index === filteredEvents.length - 1 && !hasNextPage}
                     nextTimestamp={nextTimestamp}
                     displayNumber={displayNumber}
                   />

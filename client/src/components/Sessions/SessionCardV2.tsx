@@ -31,6 +31,18 @@ export function SessionCardV2({ session, selected = false, onSelect }: SessionCa
         <span className="text-[10px] font-mono text-neutral-400 hidden xl:inline">{session.user_id.slice(0, 12)}</span>
         <span className="text-xs text-neutral-300 truncate">{label}</span>
       </div>
+      {/* City and Screen */}
+      <div className="mt-1 text-[10px] text-neutral-400 flex items-center gap-2">
+        {session.city ? <span className="truncate" title={session.city}>{session.city}</span> : null}
+        {session.screen_width && session.screen_height ? (
+          <span className="text-neutral-500">•</span>
+        ) : null}
+        {session.screen_width && session.screen_height ? (
+          <span>
+            {session.screen_width} × {session.screen_height}
+          </span>
+        ) : null}
+      </div>
       <div className="mt-2 flex items-center gap-1 text-[10px] text-neutral-300">
         <Badge variant="outline" className="h-5 px-1 gap-1 bg-neutral-800 text-neutral-200">
           <FileText className="w-3 h-3 text-blue-500" />
