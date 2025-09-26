@@ -44,12 +44,11 @@ export interface GetSessionsRequest {
   Querystring: FilterParams<{
     page: number;
     userId?: string;
-    q?: string;
   }>;
 }
 
 export async function getSessions(req: FastifyRequest<GetSessionsRequest>, res: FastifyReply) {
-  const { filters, page, userId, q } = req.query as any;
+  const { filters, page, userId } = req.query;
   const site = req.params.site;
   const userHasAccessToSite = await getUserHasAccessToSitePublic(req, site);
   if (!userHasAccessToSite) {
@@ -58,23 +57,6 @@ export async function getSessions(req: FastifyRequest<GetSessionsRequest>, res: 
 
   const filterStatement = getFilterStatement(filters);
   const timeStatement = getTimeStatement(req.query);
-
-  const searchCondition = q
-    ? ` AND EXISTS (
-        SELECT 1
-        FROM events ev
-        WHERE ev.site_id = {siteId:Int32}
-          AND ev.session_id = AggregatedSessions.session_id
-          AND (
-            positionCaseInsensitive(ev.pathname, {q:String}) > 0 OR
-            positionCaseInsensitive(ev.querystring, {q:String}) > 0 OR
-            positionCaseInsensitive(ev.page_title, {q:String}) > 0 OR
-            positionCaseInsensitive(ev.event_name, {q:String}) > 0 OR
-            positionCaseInsensitive(ev.referrer, {q:String}) > 0 OR
-            positionCaseInsensitive(toString(ev.props), {q:String}) > 0
-          )
-      )`
-    : "";
 
   const query = `
   WITH AggregatedSessions AS (
@@ -121,7 +103,7 @@ export async function getSessions(req: FastifyRequest<GetSessionsRequest>, res: 
   )
   SELECT *
   FROM AggregatedSessions
-  WHERE 1 = 1 ${filterStatement}${'${searchCondition}'}
+  WHERE 1 = 1 ${filterStatement}
   ORDER BY session_end DESC
   LIMIT {limit:Int32} OFFSET {offset:Int32}
   `;
@@ -135,7 +117,6 @@ export async function getSessions(req: FastifyRequest<GetSessionsRequest>, res: 
         userId,
         limit: 100,
         offset: (page - 1) * 100,
-        q,
       },
     });
 
