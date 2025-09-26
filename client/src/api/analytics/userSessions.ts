@@ -37,7 +37,7 @@ export type GetSessionsResponse = {
   ip: string;
 }[];
 
-export function useGetSessionsInfinite(userId?: string) {
+export function useGetSessionsInfinite(userId?: string, q?: string) {
   const { time, site, filters } = useStore();
 
   // Get the appropriate time parameters using getQueryParams
@@ -46,7 +46,7 @@ export function useGetSessionsInfinite(userId?: string) {
   const filteredFilters = getFilteredFilters(SESSION_PAGE_FILTERS);
 
   return useInfiniteQuery<APIResponse<GetSessionsResponse>>({
-    queryKey: ["sessions-infinite", time, site, filteredFilters, userId],
+    queryKey: ["sessions-infinite", time, site, filteredFilters, userId, q?.trim() || ""],
     queryFn: ({ pageParam = 1 }) => {
       // Use an object for request parameters so we can conditionally add fields
       const requestParams: Record<string, any> = {
@@ -67,6 +67,11 @@ export function useGetSessionsInfinite(userId?: string) {
         // Only add date parameters if not filtering by userId
         requestParams.startDate = timeParams.startDate;
         requestParams.endDate = timeParams.endDate;
+      }
+
+      // Add search query if provided
+      if (q && q.trim()) {
+        requestParams.q = q.trim();
       }
 
       return authedFetch<APIResponse<GetSessionsResponse>>(`/sessions/${site}`, requestParams);

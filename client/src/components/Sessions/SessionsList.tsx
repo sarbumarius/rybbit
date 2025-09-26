@@ -9,7 +9,7 @@ import { Input } from "../ui/input";
 
 export default function SessionsList({ userId }: { userId?: string }) {
   // Get sessions data with infinite loading
-  const { data, isLoading, error, fetchNextPage, hasNextPage, isFetchingNextPage } = useGetSessionsInfinite(userId);
+  const { data, isLoading, error, fetchNextPage, hasNextPage, isFetchingNextPage } = useGetSessionsInfinite(userId, sessionSearch);
 
   // Combine all pages of data
   const flattenedData = useMemo(() => {
@@ -78,7 +78,7 @@ export default function SessionsList({ userId }: { userId?: string }) {
             inputSize="sm"
             value={sessionSearch}
             onChange={e => setSessionSearch(e.target.value)}
-            placeholder="Search actions and pages..."
+            placeholder="Search sessions by actions/pages..."
             className="h-8 w-full"
           />
         </div>
@@ -113,7 +113,7 @@ export default function SessionsList({ userId }: { userId?: string }) {
       <div className="max-h-[93vh] overflow-auto">
         {selectedSession ? (
           <div className="rounded-lg border border-neutral-800 overflow-hidden bg-neutral-900">
-            <SessionDetails session={selectedSession} userId={userId} searchQuery={sessionSearch} />
+            <SessionDetails session={selectedSession} userId={userId} />
           </div>
         ) : (
           <div className="rounded-lg border border-neutral-800 bg-neutral-900 p-6 text-neutral-400">
