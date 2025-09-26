@@ -38,11 +38,11 @@ export function SessionCardV2({ session, selected = false, onSelect }: SessionCa
         <div className="flex items-center gap-2">
             <span className="text-xs text-neutral-300 truncate">{label}</span>
         </div>
-      {/* City and Screen */}
-      <div className="mt-1 text-[10px] text-neutral-400 grid grid-cols-1 gap-2">
+      {/* City, Screen, Device, IP */}
+      <div className="mt-1 text-[10px] text-neutral-400 grid grid-cols-1 gap-1">
 
 
-          {session.ip ? <div className="truncate text-md" title={session.ip}>{session.ip}</div> : null}
+          {session.ip ? <div className="truncate" title={session.ip}>{session.ip}</div> : null}
 
         {session.city ? <span className="truncate" title={session.city}>{session.city}</span> : null}
         {/*{session.screen_width && session.screen_height ? (*/}
@@ -52,6 +52,9 @@ export function SessionCardV2({ session, selected = false, onSelect }: SessionCa
           <span>
             {session.screen_width} × {session.screen_height}
           </span>
+        ) : null}
+        {session.device_type ? (
+          <span title={session.device_type}>{session.device_type}</span>
         ) : null}
       </div>
       <div className="mt-2 flex items-center gap-1 text-[10px] text-neutral-300">

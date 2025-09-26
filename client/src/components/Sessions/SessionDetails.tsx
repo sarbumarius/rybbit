@@ -14,11 +14,12 @@ import {
   Smartphone,
   Tablet,
   TriangleAlert,
+  RefreshCw,
 } from "lucide-react";
 import { DateTime } from "luxon";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { memo, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { GetSessionsResponse, SessionEvent, useGetSessionDetailsInfinite } from "../../api/analytics/userSessions";
 import { Browser } from "../../app/[site]/components/shared/icons/Browser";
 import { CountryFlag } from "../../app/[site]/components/shared/icons/CountryFlag";
@@ -283,6 +284,47 @@ const SessionDetailsTimelineSkeleton = memo(({ itemCount }: { itemCount: number 
   );
 });
 
+function CombinedRefresh({ isFetching, onRefresh }: { isFetching: boolean; onRefresh: () => void }) {
+  const [countdown, setCountdown] = useState(5);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setCountdown(prev => (prev > 1 ? prev - 1 : 5));
+    }, 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  // When a fetch completes, reset the countdown to align with the 5s interval
+  useEffect(() => {
+    if (!isFetching) {
+      setCountdown(5);
+    }
+  }, [isFetching]);
+
+  return (
+    <Button
+      size="sm"
+      variant="outline"
+      className="h-6 px-2"
+      onClick={() => {
+        if (!isFetching) {
+          onRefresh();
+          setCountdown(5);
+        }
+      }}
+      disabled={isFetching}
+      title={`Auto refresh in ${countdown}s`}
+    >
+      {isFetching ? (
+        <Loader2 className="w-3 h-3 animate-spin" />
+      ) : (
+        <RefreshCw className="w-3 h-3" />
+      )}
+      <span className="ml-1 text-xs">refresh in {countdown}s</span>
+    </Button>
+  );
+}
+
 interface SessionDetailsProps {
   session: GetSessionsResponse[number];
   userId?: string;
@@ -297,8 +339,20 @@ export function SessionDetails({ session, userId, searchQuery }: SessionDetailsP
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
+    dataUpdatedAt,
+    isFetching,
+    refetch,
   } = useGetSessionDetailsInfinite(session.session_id);
   const { site } = useParams();
+
+  // Tick every 5s to keep relative "updated" label fresh even if data hasn't changed
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => t + 1), 5000);
+    return () => clearInterval(id);
+  }, []);
+
+  const lastUpdatedLabel = dataUpdatedAt ? DateTime.fromMillis(dataUpdatedAt).toRelative() : undefined;
 
   // Flatten all events into a single array
   const allEvents = useMemo(() => {
@@ -367,62 +421,217 @@ export function SessionDetails({ session, userId, searchQuery }: SessionDetailsP
         </Alert>
       ) : sessionDetailsData?.pages[0]?.data ? (
         <Tabs defaultValue="timeline" className="mt-4 relative">
-          <div className="flex justify-between items-center mb-6">
-            <TabsList className="bg-neutral-800">
-              <TabsTrigger value="timeline">Timeline</TabsTrigger>
-              <TabsTrigger value="info">Session Info</TabsTrigger>
-            </TabsList>
-            {!userId ? (
 
-                    <div className="flex items-center gap-2 mb-3 absolute right-0 top-0">
-                      <span className="text-xs text-neutral-400">Sort:</span>
-                      <Button
-                          size="sm"
-                          variant={sortOrder === "desc" ? "default" : "outline"}
-                          onClick={() => setSortOrder("desc")}
-                      >
-                        Newest first
-                      </Button>
-                      <Button
-                          size="sm"
-                          variant={sortOrder === "asc" ? "default" : "outline"}
-                          onClick={() => setSortOrder("asc")}
-                      >
-                        Oldest first
-                      </Button>
-                      <Link href={`/${site}/user/${session.user_id}`}>
-                        <Button size="sm" variant="success">
-                          View User <ArrowRight className="w-4 h-4" />
-                        </Button>
-                      </Link>
 
+
+            <div className=" border border-neutral-800 p-3 rounded-lg  grid grid-cols-1 lg:grid-cols-[auto_auto_auto] gap-8 mb-6">
+                {/* User Information */}
+                <div>
+                    <h4 className="text-sm font-medium mb-3 text-neutral-300 border-b border-neutral-800 pb-2">
+                        User Information
+                    </h4>
+                    <div className="space-y-3">
+                        {sessionDetails?.user_id && (
+                            <div className="flex items-center gap-2">
+                                <div className="h-7 w-7 bg-neutral-800 rounded-full flex items-center justify-center flex-shrink-0">
+                                    <Avatar size={24} name={sessionDetails.user_id} />
+                                </div>
+                                <div>
+                                    <div className="text-sm text-neutral-400 flex items-center">
+                                        <span className="font-medium text-neutral-300">User ID:</span>
+                                        <CopyText text={sessionDetails.user_id} maxLength={24} className="inline-flex ml-2" />
+                                    </div>
+                                    <div className="text-sm text-neutral-400 flex items-center">
+                                        <span className="font-medium text-neutral-300">Session ID:</span>
+                                        <CopyText text={sessionDetails.session_id} maxLength={20} className="inline-flex ml-2" />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="space-y-2">
+                            {sessionDetails?.language && (
+                                <div className="text-sm flex items-center gap-2">
+                                    <span className="font-medium text-neutral-300 min-w-[80px]">Language:</span>
+                                    <span className="text-neutral-400">
+                          {sessionDetails.language ? getLanguageName(sessionDetails.language) : "N/A"}
+                        </span>
+                                </div>
+                            )}
+
+                            {sessionDetails?.country && (
+                                <div className="flex items-center gap-2 text-sm">
+                                    <span className="font-medium text-neutral-300 min-w-[80px]">Country:</span>
+                                    <div className="flex items-center gap-1 text-neutral-400">
+                                        <CountryFlag country={sessionDetails.country} />
+                                        <span>{getCountryName(sessionDetails.country)}</span>
+                                        {sessionDetails.region && <span>({sessionDetails.region})</span>}
+                                    </div>
+                                </div>
+                            )}
+                            {sessionDetails?.region && getRegionName(sessionDetails.region) && (
+                                <div className="flex items-center gap-2 text-sm">
+                                    <span className="font-medium text-neutral-300 min-w-[80px]">Region:</span>
+                                    <span className="text-neutral-400">{getRegionName(sessionDetails.region)}</span>
+                                </div>
+                            )}
+                            {sessionDetails?.city && (
+                                <div className="flex items-center gap-2 text-sm">
+                                    <span className="font-medium text-neutral-300 min-w-[80px]">City:</span>
+                                    <span className="text-neutral-400">{sessionDetails.city}</span>
+                                </div>
+                            )}
+                        </div>
                     </div>
-
-
-            ) : (
-                <div className="flex items-center gap-2 mb-3 absolute right-0 top-0">
-                  <span className="text-xs text-neutral-400">Sort:</span>
-                  <Button
-                      size="sm"
-                      variant={sortOrder === "desc" ? "default" : "outline"}
-                      onClick={() => setSortOrder("desc")}
-                  >
-                    Newest first
-                  </Button>
-                  <Button
-                      size="sm"
-                      variant={sortOrder === "asc" ? "default" : "outline"}
-                      onClick={() => setSortOrder("asc")}
-                  >
-                    Oldest first
-                  </Button>
                 </div>
-            )}
-          </div>
 
-          <TabsContent value="timeline" className="mt-4 ">
-            <div className="mb-4 px-1">
+                {/* Device Information */}
+                <div>
+                    <h4 className="text-sm font-medium mb-3 text-neutral-300 border-b border-neutral-800 pb-2">
+                        Device Information
+                    </h4>
+                    <div className="space-y-3">
+                        <div className="flex items-center gap-2 text-sm">
+                            <span className="font-medium text-neutral-300 min-w-[80px]">Device:</span>
+                            <div className="flex items-center gap-1.5 text-neutral-400">
+                                {sessionDetails?.device_type === "Desktop" && <Monitor className="w-4 h-4" />}
+                                {sessionDetails?.device_type === "Mobile" && <Smartphone className="w-4 h-4" />}
+                                {sessionDetails?.device_type === "Tablet" && <Tablet className="w-4 h-4" />}
+                                <span>{sessionDetails?.device_type || "Unknown"}</span>
+                            </div>
+                        </div>
 
+                        <div className="flex items-center gap-2 text-sm">
+                            <span className="font-medium text-neutral-300 min-w-[80px]">Browser:</span>
+                            <div className="flex items-center gap-1.5 text-neutral-400">
+                                <Browser browser={sessionDetails?.browser || "Unknown"} />
+                                <span>
+                        {sessionDetails?.browser || "Unknown"}
+                                    {sessionDetails?.browser_version && (
+                                        <span className="ml-1">v{sessionDetails.browser_version}</span>
+                                    )}
+                      </span>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 text-sm">
+                            <span className="font-medium text-neutral-300 min-w-[80px]">OS:</span>
+                            <div className="flex items-center gap-1.5 text-neutral-400">
+                                <OperatingSystem os={sessionDetails?.operating_system || ""} />
+                                <span>
+                        {sessionDetails?.operating_system || "Unknown"}
+                                    {sessionDetails?.operating_system_version && (
+                                        <span className="ml-1">{sessionDetails.operating_system_version}</span>
+                                    )}
+                      </span>
+                            </div>
+                        </div>
+
+                        {sessionDetails?.screen_width && sessionDetails?.screen_height ? (
+                            <div className="flex items-center gap-2 text-sm">
+                                <span className="font-medium text-neutral-300 min-w-[80px]">Screen:</span>
+                                <span className="text-neutral-400">
+                        {sessionDetails.screen_width} × {sessionDetails.screen_height}
+                      </span>
+                            </div>
+                        ) : null}
+                        {sessionDetails?.ip && (
+                            <div className="flex items-center gap-2 text-sm">
+                                <span className="font-medium text-neutral-300 min-w-[80px]">IP:</span>
+                                <span className="text-neutral-400">{sessionDetails.ip}</span>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Source Information */}
+                <div>
+                    <h4 className="text-sm font-medium mb-3 text-neutral-300 border-b border-neutral-800 pb-2">
+                        Source Information
+                    </h4>
+                    <div className="space-y-3">
+                        <div className="flex items-center gap-2 text-sm">
+                            <span className="font-medium text-neutral-300 min-w-[80px]">Channel:</span>
+                            <div className="flex items-center gap-1.5 text-neutral-400">
+                                <span>{sessionDetails?.channel || "None"}</span>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 text-sm">
+                            <span className="font-medium text-neutral-300 min-w-[80px]">Referrer:</span>
+                            <div className="flex items-center gap-1.5 text-neutral-400">
+                                <span>{sessionDetails?.referrer || "None"}</span>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 text-sm">
+                            <span className="font-medium text-neutral-300 min-w-[80px]">Entry Page:</span>
+                            <div className="flex items-center gap-1.5 text-neutral-400">
+                                <span>{sessionDetails?.entry_page || "None"}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+
+            <div className="mb-4 px-1 relative pt-4">
+
+                <div className="flex justify-between items-center mb-6">
+
+
+                    {!userId ? (
+
+                        <div className="flex items-center gap-2 mb-3 absolute right-0 top-0">
+                            <span className="text-xs text-neutral-400">Sort:</span>
+                            <Button
+                                size="sm"
+                                variant={sortOrder === "desc" ? "default" : "outline"}
+                                onClick={() => setSortOrder("desc")}
+                            >
+                                Newest first
+                            </Button>
+                            <Button
+                                size="sm"
+                                variant={sortOrder === "asc" ? "default" : "outline"}
+                                onClick={() => setSortOrder("asc")}
+                            >
+                                Oldest first
+                            </Button>
+                            <Link href={`/${site}/user/${session.user_id}`}>
+                                <Button size="sm" variant="success">
+                                    View User <ArrowRight className="w-4 h-4" />
+                                </Button>
+                            </Link>
+                            <CombinedRefresh isFetching={isFetching} onRefresh={refetch} />
+
+
+                        </div>
+
+
+                    ) : (
+                        <div className="flex items-center gap-2 mb-3 absolute right-0 top-0">
+                            <span className="text-xs text-neutral-400">Sort:</span>
+                            <Button
+                                size="sm"
+                                variant={sortOrder === "desc" ? "default" : "outline"}
+                                onClick={() => setSortOrder("desc")}
+                            >
+                                Newest first
+                            </Button>
+                            <Button
+                                size="sm"
+                                variant={sortOrder === "asc" ? "default" : "outline"}
+                                onClick={() => setSortOrder("asc")}
+                            >
+                                Oldest first
+                            </Button>
+                            
+                            <CombinedRefresh isFetching={isFetching} onRefresh={refetch} />
+
+                        </div>
+                    )}
+                </div>
 
 
 
@@ -491,159 +700,8 @@ export function SessionDetails({ session, userId, searchQuery }: SessionDetailsP
                 </div>
               )}
             </div>
-          </TabsContent>
 
-          <TabsContent value="info" className="mt-4">
-            <div className="grid grid-cols-1 lg:grid-cols-[auto_auto_auto] gap-8 mb-6">
-              {/* User Information */}
-              <div>
-                <h4 className="text-sm font-medium mb-3 text-neutral-300 border-b border-neutral-800 pb-2">
-                  User Information
-                </h4>
-                <div className="space-y-3">
-                  {sessionDetails?.user_id && (
-                    <div className="flex items-center gap-2">
-                      <div className="h-7 w-7 bg-neutral-800 rounded-full flex items-center justify-center flex-shrink-0">
-                        <Avatar size={24} name={sessionDetails.user_id} />
-                      </div>
-                      <div>
-                        <div className="text-sm text-neutral-400 flex items-center">
-                          <span className="font-medium text-neutral-300">User ID:</span>
-                          <CopyText text={sessionDetails.user_id} maxLength={24} className="inline-flex ml-2" />
-                        </div>
-                        <div className="text-sm text-neutral-400 flex items-center">
-                          <span className="font-medium text-neutral-300">Session ID:</span>
-                          <CopyText text={sessionDetails.session_id} maxLength={20} className="inline-flex ml-2" />
-                        </div>
-                      </div>
-                    </div>
-                  )}
 
-                  <div className="space-y-2">
-                    {sessionDetails?.language && (
-                      <div className="text-sm flex items-center gap-2">
-                        <span className="font-medium text-neutral-300 min-w-[80px]">Language:</span>
-                        <span className="text-neutral-400">
-                          {sessionDetails.language ? getLanguageName(sessionDetails.language) : "N/A"}
-                        </span>
-                      </div>
-                    )}
-
-                    {sessionDetails?.country && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <span className="font-medium text-neutral-300 min-w-[80px]">Country:</span>
-                        <div className="flex items-center gap-1 text-neutral-400">
-                          <CountryFlag country={sessionDetails.country} />
-                          <span>{getCountryName(sessionDetails.country)}</span>
-                          {sessionDetails.region && <span>({sessionDetails.region})</span>}
-                        </div>
-                      </div>
-                    )}
-                    {sessionDetails?.region && getRegionName(sessionDetails.region) && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <span className="font-medium text-neutral-300 min-w-[80px]">Region:</span>
-                        <span className="text-neutral-400">{getRegionName(sessionDetails.region)}</span>
-                      </div>
-                    )}
-                    {sessionDetails?.city && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <span className="font-medium text-neutral-300 min-w-[80px]">City:</span>
-                        <span className="text-neutral-400">{sessionDetails.city}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Device Information */}
-              <div>
-                <h4 className="text-sm font-medium mb-3 text-neutral-300 border-b border-neutral-800 pb-2">
-                  Device Information
-                </h4>
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2 text-sm">
-                    <span className="font-medium text-neutral-300 min-w-[80px]">Device:</span>
-                    <div className="flex items-center gap-1.5 text-neutral-400">
-                      {sessionDetails?.device_type === "Desktop" && <Monitor className="w-4 h-4" />}
-                      {sessionDetails?.device_type === "Mobile" && <Smartphone className="w-4 h-4" />}
-                      {sessionDetails?.device_type === "Tablet" && <Tablet className="w-4 h-4" />}
-                      <span>{sessionDetails?.device_type || "Unknown"}</span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 text-sm">
-                    <span className="font-medium text-neutral-300 min-w-[80px]">Browser:</span>
-                    <div className="flex items-center gap-1.5 text-neutral-400">
-                      <Browser browser={sessionDetails?.browser || "Unknown"} />
-                      <span>
-                        {sessionDetails?.browser || "Unknown"}
-                        {sessionDetails?.browser_version && (
-                          <span className="ml-1">v{sessionDetails.browser_version}</span>
-                        )}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 text-sm">
-                    <span className="font-medium text-neutral-300 min-w-[80px]">OS:</span>
-                    <div className="flex items-center gap-1.5 text-neutral-400">
-                      <OperatingSystem os={sessionDetails?.operating_system || ""} />
-                      <span>
-                        {sessionDetails?.operating_system || "Unknown"}
-                        {sessionDetails?.operating_system_version && (
-                          <span className="ml-1">{sessionDetails.operating_system_version}</span>
-                        )}
-                      </span>
-                    </div>
-                  </div>
-
-                  {sessionDetails?.screen_width && sessionDetails?.screen_height ? (
-                    <div className="flex items-center gap-2 text-sm">
-                      <span className="font-medium text-neutral-300 min-w-[80px]">Screen:</span>
-                      <span className="text-neutral-400">
-                        {sessionDetails.screen_width} × {sessionDetails.screen_height}
-                      </span>
-                    </div>
-                  ) : null}
-                  {sessionDetails?.ip && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <span className="font-medium text-neutral-300 min-w-[80px]">IP:</span>
-                      <span className="text-neutral-400">{sessionDetails.ip}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Source Information */}
-              <div>
-                <h4 className="text-sm font-medium mb-3 text-neutral-300 border-b border-neutral-800 pb-2">
-                  Source Information
-                </h4>
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2 text-sm">
-                    <span className="font-medium text-neutral-300 min-w-[80px]">Channel:</span>
-                    <div className="flex items-center gap-1.5 text-neutral-400">
-                      <span>{sessionDetails?.channel || "None"}</span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 text-sm">
-                    <span className="font-medium text-neutral-300 min-w-[80px]">Referrer:</span>
-                    <div className="flex items-center gap-1.5 text-neutral-400">
-                      <span>{sessionDetails?.referrer || "None"}</span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 text-sm">
-                    <span className="font-medium text-neutral-300 min-w-[80px]">Entry Page:</span>
-                    <div className="flex items-center gap-1.5 text-neutral-400">
-                      <span>{sessionDetails?.entry_page || "None"}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </TabsContent>
         </Tabs>
       ) : (
         <div className="py-4 text-center text-neutral-400">No data available</div>

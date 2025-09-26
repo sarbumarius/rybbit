@@ -80,6 +80,8 @@ export function useGetSessionsInfinite(userId?: string) {
       return undefined;
     },
     staleTime: Infinity,
+    refetchInterval: 5000,
+    refetchIntervalInBackground: true,
   });
 }
 
@@ -177,6 +179,8 @@ export function useGetSessionDetailsInfinite(sessionId: string | null) {
     },
     enabled: !!sessionId && !!site,
     staleTime: Infinity,
+    refetchInterval: 5000,
+    refetchIntervalInBackground: true,
   });
 }
 

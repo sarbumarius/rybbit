@@ -6,6 +6,7 @@ import { NothingFound } from "../NothingFound";
 import { Rewind } from "lucide-react";
 import { SessionDetails } from "./SessionDetails";
 import { Input } from "../ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 
 export default function SessionsList({ userId }: { userId?: string }) {
   // Get sessions data with infinite loading
@@ -20,18 +21,46 @@ export default function SessionsList({ userId }: { userId?: string }) {
   // Local search for actions and pages (applies to details view)
   const [sessionSearch, setSessionSearch] = useState("");
 
+  // Sidebar sort key (client-side). Default: last seen (most recent first)
+  const [sortKey, setSortKey] = useState<"last_seen" | "events" | "pageviews">("last_seen");
+
+  // Sort sessions client-side based on sortKey
+  const sortedData = useMemo(() => {
+    const arr = [...flattenedData];
+    const byTimeDesc = (a: typeof arr[number], b: typeof arr[number]) =>
+      new Date(b.session_start).getTime() - new Date(a.session_start).getTime();
+
+    if (sortKey === "events") {
+      arr.sort((a, b) => {
+        if (b.events !== a.events) return b.events - a.events;
+        if (b.pageviews !== a.pageviews) return b.pageviews - a.pageviews;
+        return byTimeDesc(a, b);
+      });
+    } else if (sortKey === "pageviews") {
+      arr.sort((a, b) => {
+        if (b.pageviews !== a.pageviews) return b.pageviews - a.pageviews;
+        if (b.events !== a.events) return b.events - a.events;
+        return byTimeDesc(a, b);
+      });
+    } else {
+      // last_seen -> use session_start as proxy for recency
+      arr.sort(byTimeDesc);
+    }
+    return arr as GetSessionsResponse;
+  }, [flattenedData, sortKey]);
+
   // Selection state: default to latest session when data arrives
   const [selectedId, setSelectedId] = useState<string | null>(null);
   useEffect(() => {
-    if (flattenedData.length === 0) {
+    if (sortedData.length === 0) {
       setSelectedId(null);
       return;
     }
     // If nothing selected or current selection no longer exists, select most recent (first item)
-    if (!selectedId || !flattenedData.some(s => s.session_id === selectedId)) {
-      setSelectedId(flattenedData[0].session_id);
+    if (!selectedId || !sortedData.some(s => s.session_id === selectedId)) {
+      setSelectedId(sortedData[0].session_id);
     }
-  }, [flattenedData, selectedId]);
+  }, [sortedData, selectedId]);
 
   // Find selected session object
   const selectedSession = useMemo(() => {
@@ -72,9 +101,21 @@ export default function SessionsList({ userId }: { userId?: string }) {
     <div className="grid grid-cols-1 lg:grid-cols-[minmax(180px,10%)_1fr] gap-3 items-start">
       {/* Left 10% list */}
       <div className="space-y-2 max-h-[93vh] overflow-auto pr-1" ref={listRef}>
+        {/* Sort controls */}
+        <div className="sticky top-0 bg-neutral-900 z-10 pt-2">
+          <Select value={sortKey} onValueChange={(val) => setSortKey(val as typeof sortKey)}>
+            <SelectTrigger className="h-8 w-full">
+              <SelectValue placeholder="Sort by" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="last_seen">last seen</SelectItem>
+              <SelectItem value="events">events</SelectItem>
+              <SelectItem value="pageviews">pageviews</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
 
-
-        {flattenedData.map((session, index) => (
+        {sortedData.map((session, index) => (
           <SessionCardV2
             key={`${session.session_id}-${index}`}
             session={session}

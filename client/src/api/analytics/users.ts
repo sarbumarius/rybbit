@@ -20,6 +20,7 @@ export type UsersResponse = {
   sessions: number;
   last_seen: string;
   first_seen: string;
+  ip?: string;
 };
 
 export interface GetUsersOptions {
@@ -72,7 +73,8 @@ export function useGetUsers(options: GetUsersOptions) {
     staleTime: 0,
     // Enable refetching when the window regains focus
     refetchOnWindowFocus: true,
-    // Add a background refetch interval (every 30 seconds)
-    // refetchInterval: 30000,
+    // Auto refresh every 5 seconds to keep list fresh
+    refetchInterval: 5000,
+    refetchIntervalInBackground: true,
   });
 }

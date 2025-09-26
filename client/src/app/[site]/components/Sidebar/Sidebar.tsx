@@ -126,7 +126,7 @@ function SidebarContent() {
               href={getTabPath("users")}
               icon={<User className="w-4 h-4" />}
           />
-          
+
         <SidebarComponents.Item
           label="Sessions"
           active={isActiveTab("sessions")}
