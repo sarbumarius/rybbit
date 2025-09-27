@@ -130,6 +130,8 @@ function PageviewItem({
                         nextTimestamp,
                         displayNumber,
                         anchorId,
+                        showCampaigns,
+                        showProducts,
                       }: {
   item: SessionEvent;
   index: number;
@@ -137,6 +139,8 @@ function PageviewItem({
   nextTimestamp?: string; // Timestamp of the next event for duration calculation
   displayNumber?: number;
   anchorId?: string;
+  showCampaigns: boolean;
+  showProducts: boolean;
 }) {
   const isError = item.type === "error";
   const isEvent = item.type === "custom_event";
@@ -261,11 +265,11 @@ function PageviewItem({
                 rel="noopener noreferrer"
               >
                 <div
-                  className="text-[12px] truncate hover:underline max-w-[calc(min(100vw,1150px)-250px)]"
+                  className="text-[12px] truncate hover:underline max-w-[20vw]"
                   title={item.pathname}
 
 
-                  
+
                 >
                   {displayLabel}
                 </div>
@@ -297,7 +301,7 @@ function PageviewItem({
             </div>
           </div>
         )}
-        {isPageview && marketingKeys.length > 0 && (
+        {isPageview && marketingKeys.length > 0 && showCampaigns && (
           <div className="pl-7 mt-1">
             {/* Primary tracked identifiers */}
             <div className="flex flex-wrap gap-2 items-center">
@@ -346,7 +350,7 @@ function PageviewItem({
             </div>
           </div>
         )}
-        {isPageview && productSlug && (
+        {isPageview && productSlug && showProducts && (
           <div className="flex items-start pl-7 mt-2">
             {productLoading ? (
               <div className="flex items-center gap-2 text-xs text-neutral-400">
@@ -647,6 +651,36 @@ export function SessionDetails({ session, userId, searchQuery }: SessionDetailsP
   const [activeQuickFilter, setActiveQuickFilter] = useState<null | "products" | "cart" | "checkout" | "order">(null);
   // Marketing param quick filter (e.g., fbclid, gclid, utm_*)
   const [activeMarketingId, setActiveMarketingId] = useState<string | null>(null);
+
+  // Visibility toggles controlled from SubHeader and persisted in localStorage (default true)
+  const [showProducts, setShowProducts] = useState<boolean>(true);
+  const [showCampaigns, setShowCampaigns] = useState<boolean>(true);
+
+  useEffect(() => {
+    try {
+      const sp = typeof window !== 'undefined' ? localStorage.getItem('analytics.showProducts') : null;
+      const sc = typeof window !== 'undefined' ? localStorage.getItem('analytics.showCampaigns') : null;
+      setShowProducts(sp === null ? true : sp !== '0');
+      setShowCampaigns(sc === null ? true : sc !== '0');
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    const applyFromStorage = () => {
+      try {
+        const sp = localStorage.getItem('analytics.showProducts');
+        const sc = localStorage.getItem('analytics.showCampaigns');
+        setShowProducts(sp === null ? true : sp !== '0');
+        setShowCampaigns(sc === null ? true : sc !== '0');
+      } catch {}
+    };
+    window.addEventListener('storage', applyFromStorage);
+    window.addEventListener('analytics:visibility-toggles-update', applyFromStorage as any);
+    return () => {
+      window.removeEventListener('storage', applyFromStorage);
+      window.removeEventListener('analytics:visibility-toggles-update', applyFromStorage as any);
+    };
+  }, []);
 
   // Apply client-side filtering for actions and pages if searchQuery is provided, then apply quick filter if selected
   const filteredEvents = useMemo(() => {
@@ -1273,6 +1307,7 @@ export function SessionDetails({ session, userId, searchQuery }: SessionDetailsP
 
 {/* Marketing identifiers bar (above Produse vizitate) */}
 {(() => {
+  if (!showCampaigns) return null;
   // Build ordered list with counts and keep only those found
   const items = MARKETING_IDENTIFIERS.map(m => ({
     key: m.identificator,
@@ -1321,6 +1356,7 @@ export function SessionDetails({ session, userId, searchQuery }: SessionDetailsP
 
 <div className="produseGasite mt-2">
   {(() => {
+    if (!showProducts) return null;
     // Group product pageviews by slug from the currently displayed (filtered) events
     type Group = { count: number; indices: number[] };
     const groups = new Map<string, Group>();
@@ -1451,6 +1487,8 @@ export function SessionDetails({ session, userId, searchQuery }: SessionDetailsP
                     nextTimestamp={nextTimestamp}
                     displayNumber={displayNumber}
                     anchorId={`pv-${index}`}
+                    showCampaigns={showCampaigns}
+                    showProducts={showProducts}
                   />
                 );
               })}

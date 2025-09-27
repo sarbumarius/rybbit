@@ -79,12 +79,12 @@ export default function UserPage() {
                 // Skeleton loading state for user info
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                   <div className="grid grid-cols-[100px_auto] gap-2">
-                    {Array.from({ length: 4 }).map((_, index) => (
-                      <>
-                        <Skeleton key={`label-${index}`} className="h-4 w-16" />
-                        <Skeleton key={`value-${index}`} className="h-4 w-24" />
-                      </>
-                    ))}
+                      {Array.from({ length: 4 }).map((_, index) => (
+                          <React.Fragment key={index}>
+                              <Skeleton className="h-4 w-16" />
+                              <Skeleton className="h-4 w-24" />
+                          </React.Fragment>
+                      ))}
                   </div>
                   <div className="grid grid-cols-[110px_1fr] gap-2">
                     {Array.from({ length: 4 }).map((_, index) => (

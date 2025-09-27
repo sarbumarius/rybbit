@@ -163,6 +163,50 @@ export function DateSelector({
               onClick={() =>
                 setTime({
                   mode: "past-minutes",
+                  pastMinutesStart: 2,
+                  pastMinutesEnd: 0,
+                })
+              }
+            >
+              Last 2 Minutes
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() =>
+                setTime({
+                  mode: "past-minutes",
+                  pastMinutesStart: 5,
+                  pastMinutesEnd: 0,
+                })
+              }
+            >
+              Last 5 Minutes
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() =>
+                setTime({
+                  mode: "past-minutes",
+                  pastMinutesStart: 10,
+                  pastMinutesEnd: 0,
+                })
+              }
+            >
+              Last 10 Minutes
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() =>
+                setTime({
+                  mode: "past-minutes",
+                  pastMinutesStart: 20,
+                  pastMinutesEnd: 0,
+                })
+              }
+            >
+              Last 20 Minutes
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() =>
+                setTime({
+                  mode: "past-minutes",
                   pastMinutesStart: 30,
                   pastMinutesEnd: 0,
                 })
