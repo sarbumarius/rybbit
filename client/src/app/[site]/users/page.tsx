@@ -2,7 +2,7 @@
 
 import { DateTime } from "luxon";
 import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useGetUsers } from "../../../api/analytics/users";
 import { useGetSessionsInfinite } from "../../../api/analytics/userSessions";
 import { Button } from "../../../components/ui/button";
@@ -15,7 +15,7 @@ import { Avatar } from "../../../components/Avatar";
 import { SessionDetails } from "../../../components/Sessions/SessionDetails";
 import { Badge } from "../../../components/ui/badge";
 import { formatter } from "../../../lib/utils";
-import { FileText, MousePointerClick, Rewind, RefreshCw, Loader2 } from "lucide-react";
+import { FileText, MousePointerClick, Rewind, RefreshCw, Loader2, TriangleAlert, ChevronDown, User, Fingerprint, MapPin, Monitor, Smartphone, Tablet, Globe } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../components/ui/select";
 
 
@@ -65,7 +65,7 @@ export default function UsersPage() {
   const { site } = useParams();
 
   // Sidebar state: sorting and search
-  const [sidebarSort, setSidebarSort] = useState<{ key: "last_seen" | "events" | "pageviews"; order: "asc" | "desc" }>({ key: "last_seen", order: "desc" });
+  const [sidebarSort, setSidebarSort] = useState<{ key: "last_seen" | "last_event" | "last_session" | "last_pageviews" | "multiple_events" | "multiple_sessions" | "multiple_pageviews"; order: "asc" | "desc" }>({ key: "last_seen", order: "desc" });
   const [search, setSearch] = useState("");
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
@@ -81,12 +81,31 @@ export default function UsersPage() {
   // Convert page index to 1-based for the API
   const page = pagination.pageIndex + 1;
 
+  // Map sidebar sort keys to API-supported sort keys
+  const apiSortBy = useMemo(() => {
+    switch (sidebarSort.key) {
+      case "multiple_events":
+        return "events";
+      case "multiple_sessions":
+        return "sessions";
+      case "multiple_pageviews":
+        return "pageviews";
+      // For all "last_*" variants, use last_seen as proxy on API
+      case "last_event":
+      case "last_session":
+      case "last_pageviews":
+      case "last_seen":
+      default:
+        return "last_seen";
+    }
+  }, [sidebarSort.key]);
+
   // Fetch data (users list for sidebar)
   const { data, isLoading, isError, refetch, /* dataUpdatedAt, */ isFetching } = useGetUsers({
     page,
     pageSize: pagination.pageSize,
-    sortBy: sidebarSort.key,
-    sortOrder: sidebarSort.order,
+    sortBy: apiSortBy,
+    sortOrder: "desc",
   });
 
   // Format relative time with special handling for times less than 1 minute
@@ -104,6 +123,47 @@ export default function UsersPage() {
   // Client-side filter list by user_id search
   const users = (data?.data || []).filter(u => (search ? u.user_id.toLowerCase().includes(search.toLowerCase()) : true));
 
+  // Apply client-side sorting according to sidebar selection
+  const usersSorted = useMemo(() => {
+    const arr = [...users];
+    const byLastSeenDesc = (a: typeof arr[number], b: typeof arr[number]) => new Date(b.last_seen).getTime() - new Date(a.last_seen).getTime();
+
+    switch (sidebarSort.key) {
+      case "multiple_events":
+        arr.sort((a, b) => {
+          if (b.events !== a.events) return b.events - a.events;
+          if (b.pageviews !== a.pageviews) return b.pageviews - a.pageviews;
+          if (b.sessions !== a.sessions) return b.sessions - a.sessions;
+          return byLastSeenDesc(a, b);
+        });
+        break;
+      case "multiple_sessions":
+        arr.sort((a, b) => {
+          if (b.sessions !== a.sessions) return b.sessions - a.sessions;
+          if (b.pageviews !== a.pageviews) return b.pageviews - a.pageviews;
+          if (b.events !== a.events) return b.events - a.events;
+          return byLastSeenDesc(a, b);
+        });
+        break;
+      case "multiple_pageviews":
+        arr.sort((a, b) => {
+          if (b.pageviews !== a.pageviews) return b.pageviews - a.pageviews;
+          if (b.events !== a.events) return b.events - a.events;
+          if (b.sessions !== a.sessions) return b.sessions - a.sessions;
+          return byLastSeenDesc(a, b);
+        });
+        break;
+      case "last_event":
+      case "last_session":
+      case "last_pageviews":
+      case "last_seen":
+      default:
+        arr.sort(byLastSeenDesc);
+        break;
+    }
+    return arr;
+  }, [users, sidebarSort.key]);
+
 
   if (isError) {
     return <div className="p-8 text-center text-red-500">An error occurred while fetching users data.</div>;
@@ -111,7 +171,7 @@ export default function UsersPage() {
 
   return (
     <DisabledOverlay message="Users" featurePath="users">
-      <div className="p-2 md:p-4 max-w-[1600px] mx-auto space-y-3">
+      <div className="p-2 md:p-2  mx-auto ">
         <SubHeader availableFilters={USER_PAGE_FILTERS} />
 
         <div className="rounded-md border border-neutral-800 bg-neutral-900">
@@ -120,7 +180,7 @@ export default function UsersPage() {
             {/* Sidebar 10% */}
             <div className="basis-[10%] min-w-[180px] max-w-[260px] border-r border-neutral-800 p-2 flex flex-col gap-2 h-dvh overflow-y-auto">
                 <Badge variant="outline" className="h-6 px-2 bg-neutral-800 text-neutral-100 w-full">
-                    {users.length.toLocaleString()} users
+                    {usersSorted.length.toLocaleString()} users
                 </Badge>
                 <div className="w-full">
                     <CombinedRefresh isFetching={isFetching} onRefresh={refetch} />
@@ -139,8 +199,12 @@ export default function UsersPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="last_seen">last seen</SelectItem>
-                    <SelectItem value="events">events</SelectItem>
-                    <SelectItem value="pageviews">pageviews</SelectItem>
+                    <SelectItem value="last_event">last event</SelectItem>
+                    <SelectItem value="last_session">last session</SelectItem>
+                    <SelectItem value="last_pageviews">last pageviews</SelectItem>
+                    <SelectItem value="multiple_events">multiple events</SelectItem>
+                    <SelectItem value="multiple_sessions">multiple session</SelectItem>
+                    <SelectItem value="multiple_pageviews">multiple pageviews</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -170,7 +234,7 @@ export default function UsersPage() {
                   <div className="text-xs text-neutral-500 p-2">No users</div>
                 ) : (
                   <ul className="space-y-1">
-                    {users.map(u => (
+                    {usersSorted.map(u => (
                       <li key={u.user_id}>
                         <button
                           type="button"
@@ -267,9 +331,23 @@ export default function UsersPage() {
 
 function RightPane({ selectedUserId }: { selectedUserId: string | null }) {
   // Lazy import hooks and components to keep file cohesion
-  const { data, isLoading, error } = useGetSessionsInfinite(selectedUserId || undefined);
+  const { data, isLoading, error, fetchNextPage, hasNextPage, isFetchingNextPage } = useGetSessionsInfinite(selectedUserId || undefined);
 
-  const firstSession = data?.pages?.[0]?.data?.[0];
+  const sessions = data?.pages?.flatMap(p => p.data) ?? [];
+
+  // Allow multiple open sessions. Default: if >2 sessions, open first two; else open all available.
+  const [openSet, setOpenSet] = useState<Set<number>>(new Set());
+  useEffect(() => {
+    const count = sessions.length;
+    const next = new Set<number>();
+    if (count <= 2) {
+      for (let i = 0; i < count; i++) next.add(i);
+    } else {
+      next.add(0);
+      next.add(1);
+    }
+    setOpenSet(next);
+  }, [selectedUserId, sessions.length]);
 
   if (!selectedUserId) {
     return (
@@ -280,7 +358,7 @@ function RightPane({ selectedUserId }: { selectedUserId: string | null }) {
   }
 
   return (
-    <div className="basis-[90%] h-dvh overflow-y-auto">
+    <div className="basis-[90%] h-dvh overflow-hidden">
       {isLoading ? (
         <div className="p-4">
           <div className="h-6 w-40 bg-neutral-800 rounded mb-3 animate-pulse" />
@@ -288,10 +366,145 @@ function RightPane({ selectedUserId }: { selectedUserId: string | null }) {
         </div>
       ) : error ? (
         <div className="p-4 text-red-400">Failed to load sessions.</div>
-      ) : !firstSession ? (
+      ) : sessions.length === 0 ? (
         <div className="p-4 text-neutral-500">No sessions for this user.</div>
       ) : (
-        <SessionDetails session={firstSession} userId={selectedUserId} />
+        <div className="p-0">
+          {(() => {
+            const count = sessions.length;
+            // Single session: keep full-width stacked layout
+            if (count === 1) {
+              const s = sessions[0];
+              return (
+                <div className="space-y-2 h-[94vh]">
+                  <details key={s.session_id} open className="border border-neutral-800 rounded-md overflow-hidden group h-full">
+                    <summary className="cursor-pointer select-none list-none px-3 py-2 bg-neutral-900 hover:bg-neutral-850 flex items-center justify-between">
+                      <div className="flex items-center gap-3 text-xs text-neutral-200">
+                        <span className="font-mono text-[10px] text-neutral-400">01</span>
+                        <span className="flex items-center gap-1 font-mono truncate" title={s.session_id}>
+                          <Fingerprint className="w-3 h-3 text-neutral-400" /> Fingerprint session: {s.session_id?.slice(0, 200)}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="h-5 px-1 gap-1 bg-neutral-800 text-neutral-200">
+                          <FileText className="w-3 h-3 text-blue-500" /> {s.pageviews}
+                        </Badge>
+                        <Badge variant="outline" className="h-5 px-1 gap-1 bg-neutral-800 text-neutral-200">
+                          <MousePointerClick className="w-3 h-3 text-amber-500" /> {s.events}
+                        </Badge>
+                        <Badge variant="outline" className="h-5 px-1 gap-1 bg-neutral-800 text-neutral-200">
+                          <TriangleAlert className="w-3 h-3 text-red-500" /> {s.errors ?? 0}
+                        </Badge>
+                        <ChevronDown className="w-3.5 h-3.5 text-neutral-400 transition-transform group-open:rotate-180" />
+                      </div>
+                    </summary>
+                    <div className="p-0 h-[calc(92vh-40px)] max-h-full overflow-y-auto">
+                      <SessionDetails session={s} userId={selectedUserId} />
+                    </div>
+                  </details>
+                </div>
+              );
+            }
+
+            // Two or more sessions: horizontal layout with accordion behavior
+            {
+              return (
+                <div className="h-[94vh] overflow-x-auto overflow-y-hidden [-ms-overflow-style:none] [scrollbar-width:none]" style={{ WebkitOverflowScrolling: "touch" }}>
+                  <div className="flex gap-2 snap-x snap-mandatory px-1 p-2 h-full min-h-0">
+                    {sessions.map((s, idx) => {
+                      const isActive = openSet.has(idx);
+                      return (
+                        <details
+                          key={s.session_id}
+                          open={isActive}
+                          className={`sesiunediv h-full border border-neutral-800 rounded-md overflow-hidden group snap-start flex-shrink-0 transition-all duration-300 ${isActive ? "basis-2/5 min-w-[40%]" : "basis-8 min-w-[2rem] max-w-[2rem]"}`}
+                        >
+                          <summary
+                            className={`cursor-pointer select-none list-none bg-neutral-900 hover:bg-neutral-850 flex items-center justify-between ${isActive ? "px-3 py-2" : "px-1 py-2"}`}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setOpenSet(prev => {
+                                const next = new Set(prev);
+                                if (next.has(idx)) {
+                                  next.delete(idx);
+                                } else {
+                                  next.add(idx);
+                                }
+                                return next;
+                              });
+                            }}
+                          >
+                            {isActive ? (
+                              <>
+                                <div className="flex items-center gap-3 text-xs text-neutral-200">
+                                  <span className="font-mono text-[10px] text-neutral-400">{idx + 1 < 10 ? `0${idx + 1}` : idx + 1}</span>
+                                  <span className="flex items-center gap-1 font-mono truncate" title={s.session_id}>
+                                    <Fingerprint className="w-3 h-3 text-neutral-400" /> {s.session_id?.slice(0, 200)}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="outline" className="h-5 px-1 gap-1 bg-neutral-800 text-neutral-200">
+                                    <FileText className="w-3 h-3 text-blue-500" /> {s.pageviews}
+                                  </Badge>
+                                  <Badge variant="outline" className="h-5 px-1 gap-1 bg-neutral-800 text-neutral-200">
+                                    <MousePointerClick className="w-3 h-3 text-amber-500" /> {s.events}
+                                  </Badge>
+                                  <Badge variant="outline" className="h-5 px-1 gap-1 bg-neutral-800 text-neutral-200">
+                                    <TriangleAlert className="w-3 h-3 text-red-500" /> {s.errors ?? 0}
+                                  </Badge>
+                                  <ChevronDown className="w-3.5 h-3.5 text-neutral-400 transition-transform group-open:rotate-180" />
+                                </div>
+                              </>
+                            ) : (
+                              // Collapsed: Show a slim vertical bar with vertical text/icons
+                              <div className="flex flex-col items-center justify-between h-full w-full py-2">
+                                <span className="font-mono text-[10px] text-neutral-400">{idx + 1 < 10 ? `0${idx + 1}` : idx + 1}</span>
+                                <div className="mt-5">
+                                  <div className="flex  gap-5 rotate-180 [writing-mode:vertical-rl] text-neutral-300 text-[10px]">
+                                    <span title={s.session_id} className="inline-flex items-center gap-1">
+                                      <Fingerprint className="w-3 h-3 text-neutral-400" />
+                                      {s.session_id?.slice(0, 10)}
+                                    </span>
+                                    <span className="inline-flex items-center gap-1">
+                                      <FileText className="w-3 h-3 text-blue-500" /> {s.pageviews}
+                                    </span>
+                                    <span className="inline-flex items-center gap-1">
+                                      <MousePointerClick className="w-3 h-3 text-amber-500" /> {s.events}
+                                    </span>
+                                    <span className="inline-flex items-center gap-1">
+                                      <TriangleAlert className="w-3 h-3 text-red-500" /> {s.errors ?? 0}
+                                    </span>
+                                  </div>
+                                </div>
+                                <ChevronDown className="w-3.5 h-3.5 text-neutral-400" />
+                              </div>
+                            )}
+                          </summary>
+                          <div className="p-0 h-[calc(88vh-0px)] max-h-full overflow-y-auto">
+                            <SessionDetails session={s} userId={selectedUserId} />
+                          </div>
+                        </details>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            }
+          })()}
+
+          {hasNextPage ? (
+            <div className="pt-2 pb-4 flex justify-center">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => fetchNextPage()}
+                disabled={isFetchingNextPage}
+              >
+                {isFetchingNextPage ? "Loading..." : "Load more"}
+              </Button>
+            </div>
+          ) : null}
+        </div>
       )}
     </div>
   );

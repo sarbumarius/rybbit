@@ -41,7 +41,7 @@ export function SubHeader({ availableFilters }: { availableFilters?: FilterParam
   const { time, setTime } = useStore();
 
   return (
-    <div>
+    <div className="fixed bottom-0 bg-neutral-900 left-2/4 px-5 pt-2  border-1 border-neutral-600 border border-t-1 border-b-0 rounded-t-2xl">
       <div className="flex gap-2 mb-3 justify-between">
         <div className="flex items-center gap-2">
           <MobileSidebar />

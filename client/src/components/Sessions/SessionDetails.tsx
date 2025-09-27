@@ -15,6 +15,17 @@ import {
   Tablet,
   TriangleAlert,
   RefreshCw,
+  Gift,
+  ShoppingCart,
+  CreditCard,
+  CheckCircle2,
+  ChevronDown,
+  User,
+  Fingerprint,
+  MapPin,
+  Globe,
+  SortAsc,
+  SortDesc,
 } from "lucide-react";
 import { DateTime } from "luxon";
 import Link from "next/link";
@@ -32,6 +43,85 @@ import { useGetRegionName } from "../../lib/geo";
 import { Avatar } from "../Avatar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
+// Known marketing identifiers and their friendly names
+const MARKETING_IDENTIFIERS: { identificator: string; name: string }[] = [
+  { identificator: "fbclid", name: "Facebook" },
+  { identificator: "gclid", name: "Google Ads" },
+  { identificator: "wbraid", name: "Google Ads (Web)" },
+  { identificator: "gbraid", name: "Google Ads (App)" },
+  { identificator: "dclid", name: "Google Display" },
+  { identificator: "msclkid", name: "Microsoft Ads (Bing)" },
+  { identificator: "ttclid", name: "TikTok Ads" },
+  { identificator: "twclid", name: "Twitter Ads" },
+  { identificator: "li_fat_id", name: "LinkedIn Ads" },
+  { identificator: "igshid", name: "Instagram" },
+  { identificator: "mc_eid", name: "Mailchimp" },
+  { identificator: "yclid", name: "Yandex Ads" },
+  { identificator: "utm_source", name: "UTM - Source" },
+  { identificator: "utm_medium", name: "UTM - Medium" },
+  { identificator: "utm_campaign", name: "UTM - Campaign" },
+  { identificator: "utm_term", name: "UTM - Term" },
+  { identificator: "utm_content", name: "UTM - Content" },
+];
+
+function extractMarketingKeysFromQuery(querystring?: string | null): string[] {
+  if (!querystring) return [];
+  try {
+    const qs = querystring.startsWith("?") ? querystring.slice(1) : querystring;
+    const sp = new URLSearchParams(qs);
+    const keys: string[] = [];
+    for (const { identificator } of MARKETING_IDENTIFIERS) {
+      if (sp.has(identificator)) keys.push(identificator);
+    }
+    return keys;
+  } catch {
+    // Fallback: simple contains check
+    const keys: string[] = [];
+    for (const { identificator } of MARKETING_IDENTIFIERS) {
+      if (querystring.includes(identificator + "=")) keys.push(identificator);
+    }
+    return keys;
+  }
+}
+
+// Icon (or badge) for known marketing sources
+function MarketingIcon({ id, className = "w-3.5 h-3.5" }: { id: string; className?: string }) {
+  // Use brand icons where available; fallback to a colored dot with initial
+  const base = id.toLowerCase();
+  const initial = base.startsWith("utm_") ? "U" : base[0]?.toUpperCase() || "?";
+  const color =
+    base === "fbclid" ? "bg-[#1877F2]" :
+    base === "gclid" || base === "wbraid" || base === "gbraid" || base === "dclid" ? "bg-[#4285F4]" :
+    base === "ttclid" ? "bg-[#000000]" :
+    base === "twclid" ? "bg-[#1DA1F2]" :
+    base === "li_fat_id" ? "bg-[#0A66C2]" :
+    base === "igshid" ? "bg-[#E1306C]" :
+    base === "msclkid" ? "bg-[#008373]" :
+    base === "mc_eid" ? "bg-[#FF7E00]" :
+    base === "yclid" ? "bg-[#FF0000]" :
+    base.startsWith("utm_") ? "bg-[#6B7280]" :
+    "bg-neutral-500";
+  return (
+    <span className={`inline-flex items-center justify-center ${className} rounded-full text-[9px] font-bold text-white ${color}`}
+      aria-hidden>
+      {initial}
+    </span>
+  );
+}
+
+function getAllQueryParams(querystring?: string | null): [string, string][] {
+  if (!querystring) return [];
+  try {
+    const qs = querystring.startsWith("?") ? querystring.slice(1) : querystring;
+    const sp = new URLSearchParams(qs);
+    const arr: [string, string][] = [];
+    sp.forEach((v, k) => arr.push([k, v]));
+    return arr;
+  } catch {
+    return [];
+  }
+}
+
 // Component to display a single pageview or event
 function PageviewItem({
                         item,
@@ -39,12 +129,14 @@ function PageviewItem({
                         isLast = false,
                         nextTimestamp,
                         displayNumber,
+                        anchorId,
                       }: {
   item: SessionEvent;
   index: number;
   isLast?: boolean;
   nextTimestamp?: string; // Timestamp of the next event for duration calculation
   displayNumber?: number;
+  anchorId?: string;
 }) {
   const isError = item.type === "error";
   const isEvent = item.type === "custom_event";
@@ -52,6 +144,63 @@ function PageviewItem({
   const isOutbound = item.type === "outbound";
   const timestamp = DateTime.fromSQL(item.timestamp, { zone: "utc" }).toLocal();
   const formattedTime = timestamp.toFormat(hour12 ? "h:mm:ss a" : "HH:mm:ss");
+
+  // Extract known marketing identifiers from querystring (for pageviews)
+  const marketingKeys: string[] = isPageview ? extractMarketingKeysFromQuery(item.querystring || undefined) : [];
+
+  // Extract product slug if pathname contains /produs/
+  const productSlug: string | null = (() => {
+    if (!isPageview || !item.pathname) return null;
+    try {
+      const match = String(item.pathname).match(/\/produs\/([^\/?#]+)/);
+      if (match && match[1]) {
+        return decodeURIComponent(match[1]);
+      }
+    } catch {}
+    return null;
+  })();
+
+  // Display label: if product page, show only slug; otherwise original pathname + optional query
+  const displayLabel = productSlug ? productSlug : `${item.pathname}${item.querystring ? `${item.querystring}` : ""}`;
+
+  // Product info fetching state
+  const [productInfo, setProductInfo] = useState<null | {
+    ok?: boolean;
+    product_id?: number;
+    slug?: string;
+    nume?: string;
+    pret?: number;
+    pret_regular?: number;
+    pret_redus?: number;
+    vanzari?: number;
+    comentarii?: number;
+    poza?: string;
+    excerpt?: string;
+    status?: string;
+  }>(null);
+  const [productLoading, setProductLoading] = useState<boolean>(false);
+  const [productError, setProductError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let aborted = false;
+    async function run() {
+      if (!productSlug) return;
+      try {
+        setProductLoading(true);
+        setProductError(null);
+        const data = await fetchProductInfoWithCache(productSlug);
+        if (!aborted) setProductInfo(data);
+      } catch (e: any) {
+        if (!aborted) setProductError(e?.message || "Failed to load product");
+      } finally {
+        if (!aborted) setProductLoading(false);
+      }
+    }
+    run();
+    return () => {
+      aborted = true;
+    };
+  }, [productSlug]);
 
   // Calculate duration if this is a pageview and we have the next timestamp
   let duration = null;
@@ -62,12 +211,12 @@ function PageviewItem({
   }
 
   return (
-    <div className="flex mb-3">
+    <div className="flex mb-3" id={anchorId}>
       {/* Timeline circle with number */}
       <div className="relative flex-shrink-0">
         {!isLast && (
           <div
-            className="absolute top-8 left-4 w-[1px] bg-neutral-700"
+            className="absolute top-7 left-3 w-[1px] bg-neutral-700"
             style={{
               height: "calc(100% - 20px)",
             }}
@@ -76,7 +225,7 @@ function PageviewItem({
         {/* Connecting line */}
         <div
           className={cn(
-            "flex items-center justify-center w-8 h-8 rounded-full border",
+            "flex items-center justify-center w-6 h-6 rounded-full border",
             isEvent
               ? "bg-amber-900/30 border-amber-500/50"
               : isError
@@ -86,11 +235,11 @@ function PageviewItem({
                   : "bg-blue-900/30 border-blue-500/50"
           )}
         >
-          <span className="text-sm font-medium">{displayNumber ?? index + 1}</span>
+          <span className="text-[8px] font-medium">{displayNumber ?? index + 1}</span>
         </div>
       </div>
 
-      <div className="flex flex-col ml-3 flex-1">
+      <div className="flex flex-col ml-3 flex-1 ">
         <div className="flex items-center flex-1 py-1">
           <div className="flex-shrink-0 mr-3">
             {isEvent ? (
@@ -104,7 +253,7 @@ function PageviewItem({
             )}
           </div>
 
-          <div className="flex-1 min-w-0 mr-4">
+          <div className="flex-1 min-w-0 mr-4 text-[12px]">
             {isPageview ? (
               <Link
                 href={`https://${item.hostname}${item.pathname}${item.querystring ? `${item.querystring}` : ""}`}
@@ -112,20 +261,19 @@ function PageviewItem({
                 rel="noopener noreferrer"
               >
                 <div
-                  className="text-sm truncate hover:underline "
+                  className="text-[12px] truncate hover:underline max-w-[calc(min(100vw,1150px)-250px)]"
                   title={item.pathname}
-                  style={{
-                    maxWidth: "calc(min(100vw, 1150px) - 250px)",
-                  }}
+
+
+                  
                 >
-                  {item.pathname}
-                  {item.querystring ? `${item.querystring}` : ""}
+                  {displayLabel}
                 </div>
               </Link>
             ) : isOutbound && item.props?.url ? (
               <Link href={String(item.props.url)} target="_blank" rel="noopener noreferrer">
                 <div
-                  className="text-sm truncate hover:underline text-purple-400"
+                  className="text-[12px] truncate hover:underline text-purple-400"
                   title={String(item.props.url)}
                   style={{
                     maxWidth: "calc(min(100vw, 1150px) - 250px)",
@@ -135,7 +283,7 @@ function PageviewItem({
                 </div>
               </Link>
             ) : (
-              <div className="text-sm truncate">{item.event_name || "Outbound Click"}</div>
+              <div className="text-[12px] truncate">{item.event_name || "Outbound Click"}</div>
             )}
           </div>
 
@@ -149,31 +297,153 @@ function PageviewItem({
             </div>
           </div>
         )}
+        {isPageview && marketingKeys.length > 0 && (
+          <div className="pl-7 mt-1">
+            {/* Primary tracked identifiers */}
+            <div className="flex flex-wrap gap-2 items-center">
+              {marketingKeys.map((key) => {
+                const info = MARKETING_IDENTIFIERS.find((m) => m.identificator === key);
+                return (
+                  <div key={key} className="flex items-center gap-1.5 text-[11px] bg-neutral-800 border border-neutral-700 rounded px-2 py-1 leading-tight">
+                    <MarketingIcon id={key} />
+                    <span className="font-mono text-neutral-200">{key}</span>
+                    <span className="text-neutral-400 text-[10px] -mt-0.5">{info?.name || "Marketing Param"}</span>
+                  </div>
+                );
+              })}
+              {(() => {
+                // Extra params only when at least one tracked identifier exists and there are more params present
+                const allParams = getAllQueryParams(item.querystring || undefined);
+                if (!allParams.length) return null;
+                const trackedSet = new Set(marketingKeys);
+                const extras = allParams.filter(([k]) => !trackedSet.has(k));
+                if (extras.length === 0) return null;
+                return (
+                  <div className="flex items-center flex-wrap gap-2 ml-1">
+                    {/* Divider dot */}
+                    <span className="inline-block w-1 h-1 rounded-full bg-neutral-600 mx-1" />
+                    {extras.map(([k, v]) => (
+                      <Tooltip key={`${k}=${v}`}>
+                        <TooltipTrigger asChild>
+                          <Badge
+                            variant="outline"
+                            className="h-5 px-1.5 text-[10px] bg-neutral-900 text-neutral-200 border-neutral-800 cursor-default"
+                            title={String(v)}
+                          >
+                            <span className="font-mono text-neutral-300">{k}</span>
+                          </Badge>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <div className="font-mono text-[11px] break-all">
+                            {k}={String(v)}
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        )}
+        {isPageview && productSlug && (
+          <div className="flex items-start pl-7 mt-2">
+            {productLoading ? (
+              <div className="flex items-center gap-2 text-xs text-neutral-400">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                <span>Loading product…</span>
+              </div>
+            ) : productInfo && productInfo.ok ? (
+              <div className="flex items-center gap-3 p-2 border border-neutral-800 rounded-md bg-neutral-900/50">
+                {productInfo.poza ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={productInfo.poza} alt={productInfo.nume || productInfo.slug || productSlug} className="w-12 h-12 object-cover rounded" />
+                ) : (
+                  <div className="w-12 h-12 bg-neutral-800 rounded" />
+                )}
+                <div className="min-w-0">
+                  <div className="text-xs text-neutral-200 font-medium truncate max-w-[220px]" title={productInfo.nume || productInfo.slug || productSlug}>
+                    {productInfo.nume || productInfo.slug || productSlug}
+                  </div>
+                  <div className="text-[11px] text-neutral-300 mt-0.5 flex items-center gap-2">
+                    {typeof productInfo.pret_regular === "number" && productInfo.pret_redus && productInfo.pret_redus < productInfo.pret_regular ? (
+                      <>
+                        <span className="line-through text-neutral-500">{productInfo.pret_regular} RON</span>
+                        <span className="text-green-400 font-semibold">{productInfo.pret_redus} RON</span>
+                      </>
+                    ) : (
+                      <span className="text-neutral-200 font-semibold">{productInfo.pret ?? productInfo.pret_redus ?? ""} {productInfo.pret || productInfo.pret_redus ? "RON" : ""}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : productError ? (
+              <div className="text-[11px] text-red-400">{productError}</div>
+            ) : null}
+          </div>
+        )}
         {isEvent && (
           <div className="flex items-center pl-7 mt-1">
             <div className="text-xs text-neutral-400">
               {item.props && Object.keys(item.props).length > 0 ? (
                 <span className="flex flex-wrap gap-2 mt-1">
                   {Object.entries(item.props).map(([key, value]) => (
-                    <Badge
+                    <div
                       key={key}
-                      variant="outline"
-                      className="px-1.5 py-0 h-5 text-xs bg-neutral-800 text-neutral-100 font-medium"
+
+                      className=" w-full text-xs  text-neutral-100 font-medium border border-1 rounded-md ps-3 pb-1 pt-1 border-neutral-800 h-auto "
                     >
-                      <span className="text-neutral-300 font-light mr-1">{key}:</span>{" "}
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <span className="truncate">
-                            {typeof value === "object" ? JSON.stringify(value) : String(value)}
-                          </span>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <span className="max-w-7xl">
-                            {typeof value === "object" ? JSON.stringify(value) : String(value)}
-                          </span>
-                        </TooltipContent>
-                      </Tooltip>
-                    </Badge>
+                      <div className="text-neutral-300 font-light mr-1 w-full">
+
+                      <div className="w-full block whitespace-pre-wrap">
+                        {key}:</div>{" "}
+                      </div>
+
+                          <div className="w-full block whitespace-pre-wrap">
+                            {(() => {
+                              const str = typeof value === "object" ? JSON.stringify(value) : String(value);
+                              const urlMatch = str.match(/https?:\/\/[^\s|\"]+/i);
+                              if (urlMatch) {
+                                const url = urlMatch[0];
+                                const prodMatch = url.match(/\/produs\/([^\/?#]+)/i);
+                                if (prodMatch && prodMatch[1]) {
+                                  try {
+                                    const slug = decodeURIComponent(prodMatch[1]);
+                                    return <ProductBadge slug={slug} />;
+                                  } catch {
+                                    return (
+                                      <a
+                                        href={url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-blue-400 underline"
+                                      >
+                                        vezi link
+                                      </a>
+                                    );
+                                  }
+                                }
+                                return (
+                                  <a
+                                    href={url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-blue-400 underline"
+                                  >
+                                    vezi link
+                                  </a>
+                                );
+                              }
+                              if (str.includes("|")) {
+                                return str.split("|").map((seg, i) => <div key={i}>{seg.trim()}</div>);
+                              }
+                              return str;
+                            })()}
+                          </div>
+
+
+
+                    </div>
                   ))}
                 </span>
               ) : null}
@@ -190,7 +460,7 @@ function PageviewItem({
                       variant="outline"
                       className="px-1.5 py-0 h-5 text-xs bg-neutral-800 text-neutral-100 font-medium"
                     >
-                      <span className="text-neutral-300 font-light mr-1">text:</span> {String(item.props.text)}
+                      <span className="text-neutral-300 font-light mr-1 truncate">text:</span> {String(item.props.text)}
                     </Badge>
                   ) : null}
                   {item.props.target ? (
@@ -198,7 +468,7 @@ function PageviewItem({
                       variant="outline"
                       className="px-1.5 py-0 h-5 text-xs bg-neutral-800 text-neutral-100 font-medium"
                     >
-                      <span className="text-neutral-300 font-light mr-1">target:</span> {String(item.props.target)}
+                      <span className="text-neutral-300 font-light mr-1 truncate">target:</span> {String(item.props.target)}
                     </Badge>
                   ) : null}
                 </span>
@@ -217,7 +487,7 @@ function PageviewItem({
                       variant="outline"
                       className="px-1.5 py-0 h-5 text-xs bg-neutral-800 text-neutral-100 font-medium"
                     >
-                      <span className="text-neutral-300 font-light mr-1">message:</span> {String(item.props.message)}
+                      <span className="text-neutral-300 font-light mr-1 truncate">message:</span> {String(item.props.message)}
                     </Badge>
                   )}
 
@@ -305,7 +575,7 @@ function CombinedRefresh({ isFetching, onRefresh }: { isFetching: boolean; onRef
     <Button
       size="sm"
       variant="outline"
-      className="h-6 px-2"
+      className=" px-2 border-0"
       onClick={() => {
         if (!isFetching) {
           onRefresh();
@@ -320,7 +590,7 @@ function CombinedRefresh({ isFetching, onRefresh }: { isFetching: boolean; onRef
       ) : (
         <RefreshCw className="w-3 h-3" />
       )}
-      <span className="ml-1 text-xs">refresh in {countdown}s</span>
+      <span className="ml-1 text-xs"> {countdown}s</span>
     </Button>
   );
 }
@@ -373,21 +643,103 @@ export function SessionDetails({ session, userId, searchQuery }: SessionDetailsP
     return events;
   }, [allEvents, sortOrder]);
 
-  // Apply client-side filtering for actions and pages if searchQuery is provided
+  // Quick filter state for the top icon filters
+  const [activeQuickFilter, setActiveQuickFilter] = useState<null | "products" | "cart" | "checkout" | "order">(null);
+  // Marketing param quick filter (e.g., fbclid, gclid, utm_*)
+  const [activeMarketingId, setActiveMarketingId] = useState<string | null>(null);
+
+  // Apply client-side filtering for actions and pages if searchQuery is provided, then apply quick filter if selected
   const filteredEvents = useMemo(() => {
     const q = (searchQuery || "").trim().toLowerCase();
-    if (!q) return displayEvents;
-    return displayEvents.filter(item => {
-      const parts: string[] = [];
-      if (item.type) parts.push(item.type);
-      if (item.event_name) parts.push(item.event_name);
-      if (item.pathname) parts.push(item.pathname);
-      if (item.page_title) parts.push(item.page_title);
-      if (item.querystring) parts.push(item.querystring);
-      if (item.props) parts.push(JSON.stringify(item.props));
-      return parts.some(p => p.toLowerCase().includes(q));
-    });
-  }, [displayEvents, searchQuery]);
+    let base = displayEvents;
+    if (q) {
+      base = displayEvents.filter(item => {
+        const parts: string[] = [];
+        if (item.type) parts.push(item.type);
+        if (item.event_name) parts.push(item.event_name);
+        if (item.pathname) parts.push(item.pathname);
+        if (item.page_title) parts.push(item.page_title);
+        if (item.querystring) parts.push(item.querystring);
+        if (item.props) parts.push(JSON.stringify(item.props));
+        return parts.some(p => p.toLowerCase().includes(q));
+      });
+    }
+
+    // Apply quick filters (icons)
+    if (activeQuickFilter) {
+      base = base.filter(item => {
+        switch (activeQuickFilter) {
+          case "products":
+            return item.type === "pageview" && typeof item.pathname === "string" && item.pathname.includes("/produs/");
+          case "cart":
+            return (
+              item.type === "custom_event" &&
+              typeof item.event_name === "string" &&
+              ["addtocart", "add_to_cart", "add-to-cart"].includes(item.event_name.toLowerCase())
+            );
+          case "checkout":
+            return item.type === "pageview" && typeof item.pathname === "string" && item.pathname.includes("/plata-cos/");
+          case "order":
+            return item.type === "pageview" && typeof item.pathname === "string" && item.pathname.includes("/order-received/");
+          default:
+            return true;
+        }
+      });
+    }
+
+    // Apply marketing identifier filter if active (only keep pageviews that have the selected identifier)
+    if (activeMarketingId) {
+      base = base.filter(item => item.type === "pageview" && extractMarketingKeysFromQuery(item.querystring || undefined).includes(activeMarketingId));
+    }
+
+    return base;
+  }, [displayEvents, searchQuery, activeQuickFilter, activeMarketingId]);
+
+  // Compute counts of marketing identifiers across the current scope (after search + quick filters, before marketing filter)
+  const marketingCounts = useMemo(() => {
+    const q = (searchQuery || "").trim().toLowerCase();
+    let base = displayEvents;
+    if (q) {
+      base = displayEvents.filter(item => {
+        const parts: string[] = [];
+        if (item.type) parts.push(item.type);
+        if (item.event_name) parts.push(item.event_name);
+        if (item.pathname) parts.push(item.pathname);
+        if (item.page_title) parts.push(item.page_title);
+        if (item.querystring) parts.push(item.querystring);
+        if (item.props) parts.push(JSON.stringify(item.props));
+        return parts.some(p => p.toLowerCase().includes(q));
+      });
+    }
+    if (activeQuickFilter) {
+      base = base.filter(item => {
+        switch (activeQuickFilter) {
+          case "products":
+            return item.type === "pageview" && typeof item.pathname === "string" && item.pathname.includes("/produs/");
+          case "cart":
+            return (
+              item.type === "custom_event" &&
+              typeof item.event_name === "string" &&
+              ["addtocart", "add_to_cart", "add-to-cart"].includes(item.event_name.toLowerCase())
+            );
+          case "checkout":
+            return item.type === "pageview" && typeof item.pathname === "string" && item.pathname.includes("/plata-cos/");
+          case "order":
+            return item.type === "pageview" && typeof item.pathname === "string" && item.pathname.includes("/order-received/");
+          default:
+            return true;
+        }
+      });
+    }
+    const counts = new Map<string, number>();
+    for (const item of base) {
+      if (item.type === "pageview") {
+        const keys = extractMarketingKeysFromQuery(item.querystring || undefined);
+        for (const k of keys) counts.set(k, (counts.get(k) || 0) + 1);
+      }
+    }
+    return counts;
+  }, [displayEvents, searchQuery, activeQuickFilter]);
 
   // Get session details from the first page
   const sessionDetails = sessionDetailsData?.pages[0]?.data?.session;
@@ -409,6 +761,77 @@ export function SessionDetails({ session, userId, searchQuery }: SessionDetailsP
     return allEvents.filter((p: SessionEvent) => p.type === "outbound").length;
   }, [allEvents]);
 
+  // Quick status metrics
+  const productPageviewsCount = useMemo(() => {
+    return allEvents.filter((p: SessionEvent) => p.type === "pageview" && typeof p.pathname === "string" && p.pathname.includes("/produs/")).length;
+  }, [allEvents]);
+
+  const hasAddToCart = useMemo(() => {
+    return allEvents.some(
+      (p: SessionEvent) =>
+        p.type === "custom_event" &&
+        typeof p.event_name === "string" &&
+        ["addtocart", "add_to_cart", "add-to-cart"].includes(p.event_name.toLowerCase())
+    );
+  }, [allEvents]);
+
+  // Collect slugs that were added to cart during the session
+  const addedToCartSlugs = useMemo(() => {
+    const set = new Set<string>();
+    try {
+      for (const ev of allEvents as SessionEvent[]) {
+        if (
+          ev.type === "custom_event" &&
+          typeof ev.event_name === "string" &&
+          ["addtocart", "add_to_cart", "add-to-cart"].includes(ev.event_name.toLowerCase())
+        ) {
+          const props: any = ev.props || {};
+          // 1) direct slug fields
+          const directSlug: unknown = props.slug || props.product_slug || props.produs_slug;
+          if (typeof directSlug === "string" && directSlug.trim()) {
+            set.add(directSlug.trim());
+            continue;
+          }
+          // 2) url fields containing /produs/{slug}
+          const candidates: unknown[] = [props.url, props.href, props.link, props.product_url, props.produs_url];
+          for (const c of candidates) {
+            if (typeof c === "string") {
+              const m = c.match(/\/produs\/([^\/?#]+)/i);
+              if (m && m[1]) {
+                try { set.add(decodeURIComponent(m[1])); } catch { set.add(m[1]); }
+                break;
+              }
+            }
+          }
+          // 3) scan any stringy prop value for /produs/{slug}
+          if (Object.keys(props).length) {
+            for (const v of Object.values(props)) {
+              if (typeof v === "string" && v.includes("/produs/")) {
+                const m = v.match(/\/produs\/([^\/?#]+)/i);
+                if (m && m[1]) {
+                  try { set.add(decodeURIComponent(m[1])); } catch { set.add(m[1]); }
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch {}
+    return set;
+  }, [allEvents]);
+
+  const hasCheckoutInit = useMemo(() => {
+    return allEvents.some(
+      (p: SessionEvent) => p.type === "pageview" && typeof p.pathname === "string" && p.pathname.includes("/plata-cos/")
+    );
+  }, [allEvents]);
+
+  const hasOrderReceived = useMemo(() => {
+    return allEvents.some(
+      (p: SessionEvent) => p.type === "pageview" && typeof p.pathname === "string" && p.pathname.includes("/order-received/")
+    );
+  }, [allEvents]);
+
   const { getRegionName } = useGetRegionName();
 
   return (
@@ -424,7 +847,43 @@ export function SessionDetails({ session, userId, searchQuery }: SessionDetailsP
 
 
 
-            <div className=" border border-neutral-800 p-3 rounded-lg  grid grid-cols-1 lg:grid-cols-[auto_auto_auto] gap-8 mb-6">
+            <details className="mb-6 group">
+              <summary className="cursor-pointer select-none list-none px-3 py-2 bg-neutral-900 hover:bg-neutral-850 border border-neutral-800 rounded-lg flex items-center justify-between">
+                <div className="flex items-center gap-3 text-xs text-neutral-200">
+                  {/*{sessionDetails?.user_id ? (*/}
+                  {/*  <span className="flex items-center gap-1 font-mono truncate max-w-[160px]" title={sessionDetails.user_id}>*/}
+                  {/*    <User className="w-3 h-3 text-neutral-400" /> user: {sessionDetails.user_id.slice(0, 16)}*/}
+                  {/*  </span>*/}
+                  {/*) : null}*/}
+                  {/*{sessionDetails?.session_id ? (*/}
+                  {/*  <span className="flex items-center gap-1 font-mono truncate max-w-[200px]" title={sessionDetails.session_id}>*/}
+                  {/*    <Fingerprint className="w-3 h-3 text-neutral-400" /> sid: {sessionDetails.session_id.slice(0, 20)}*/}
+                  {/*  </span>*/}
+                  {/*) : null}*/}
+                  {sessionDetails?.ip ? (
+                    <span className="flex items-center gap-1 truncate max-w-[180px]" title={sessionDetails.ip}>
+                      <Globe className="w-3 h-3 text-neutral-400" /> ip: {sessionDetails.ip}
+                    </span>
+                  ) : null}
+                  {sessionDetails?.city ? (
+                    <span className="flex items-center gap-1 truncate max-w-[160px]" title={sessionDetails.city}>
+                      <MapPin className="w-3 h-3 text-neutral-400" /> city: {sessionDetails.city}
+                    </span>
+                  ) : null}
+                  {/*{sessionDetails?.device_type ? (*/}
+                  {/*  <span className="flex items-center gap-1" title={sessionDetails.device_type}>*/}
+                  {/*    {sessionDetails.device_type === "Desktop" && <Monitor className="w-3 h-3 text-neutral-400" />}*/}
+                  {/*    {sessionDetails.device_type === "Mobile" && <Smartphone className="w-3 h-3 text-neutral-400" />}*/}
+                  {/*    {sessionDetails.device_type === "Tablet" && <Tablet className="w-3 h-3 text-neutral-400" />}*/}
+                  {/*    <span>device: {sessionDetails.device_type}</span>*/}
+                  {/*  </span>*/}
+                  {/*) : null}*/}
+
+                </div>
+                <ChevronDown className="w-3.5 h-3.5 text-neutral-400 transition-transform group-open:rotate-180" />
+              </summary>
+
+              <div className=" border border-neutral-800 p-3 rounded-lg  grid grid-cols-1 lg:grid-cols-[auto_auto_auto] gap-8 mt-2">
                 {/* User Information */}
                 <div>
                     <h4 className="text-sm font-medium mb-3 text-neutral-300 border-b border-neutral-800 pb-2">
@@ -545,7 +1004,7 @@ export function SessionDetails({ session, userId, searchQuery }: SessionDetailsP
                 </div>
 
                 {/* Source Information */}
-                <div>
+                <div className="border border-1 border-neutral-800 p-3 rounded-xl">
                     <h4 className="text-sm font-medium mb-3 text-neutral-300 border-b border-neutral-800 pb-2">
                         Source Information
                     </h4>
@@ -572,69 +1031,390 @@ export function SessionDetails({ session, userId, searchQuery }: SessionDetailsP
                         </div>
                     </div>
                 </div>
-            </div>
+              </div>
+            </details>
 
 
-            <div className="mb-4 px-1 relative pt-4">
+            <div className="mb-4 px-1 relative pt-0">
 
-                <div className="flex justify-between items-center mb-6">
+                <div className="flex justify-between items-center mb-3">
+
+
+                    <div className="flex items-center gap-3 border border-1 border-green-400 ps-3 pe-3 rounded-xl pt-1 pb-1 -mt-3 filterMaster">
+                      {/* Gift icon + count of visited products (pages containing /produs/) */}
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div
+                          onClick={() => {
+                            if (productPageviewsCount > 0) {
+                              setActiveQuickFilter(prev => (prev === "products" ? null : "products"));
+                            }
+                          }}
+                          role="button"
+                          aria-pressed={activeQuickFilter === "products"}
+                          className={cn(
+                            "flex items-center gap-1.5 rounded px-1",
+                            productPageviewsCount > 0 ? "cursor-pointer" : "cursor-default opacity-60",
+                            activeQuickFilter === "products" ? "bg-white text-neutral-900" : ""
+                          )}
+                        >
+                          <Gift className={cn(
+                            "w-4 h-4",
+                            activeQuickFilter === "products"
+                              ? "text-neutral-900"
+                              : productPageviewsCount > 0
+                                ? "text-green-400"
+                                : "text-neutral-500"
+                          )} />
+                          <Badge variant="outline" className={cn("h-5 px-1 text-neutral-200", activeQuickFilter === "products" ? "bg-white text-neutral-900 border-neutral-300" : "bg-neutral-800")}
+                          >
+                            {productPageviewsCount}
+                          </Badge>
+                        </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <span>Visited products (/produs/)</span>
+                        </TooltipContent>
+                      </Tooltip>
+
+                      {/* Cart icon if AddToCart occurred */}
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div
+                            onClick={() => {
+                              if (hasAddToCart) {
+                                setActiveQuickFilter(prev => (prev === "cart" ? null : "cart"));
+                              }
+                            }}
+                            role="button"
+                            aria-pressed={activeQuickFilter === "cart"}
+                            className={cn(
+                              "flex items-center gap-1.5 rounded px-1",
+                              hasAddToCart ? "cursor-pointer" : "cursor-default opacity-60",
+                              activeQuickFilter === "cart" ? "bg-white text-neutral-900" : ""
+                            )}
+                          >
+                            <ShoppingCart
+                              className={cn(
+                                "w-4 h-4",
+                                activeQuickFilter === "cart"
+                                  ? "text-neutral-900"
+                                  : hasAddToCart
+                                    ? "text-green-400"
+                                    : "text-neutral-500"
+                              )}
+                            />
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <span>Add to cart</span>
+                        </TooltipContent>
+                      </Tooltip>
+
+                      {/* Checkout initiation if page contains /plata-cos/ */}
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div
+                            onClick={() => {
+                              if (hasCheckoutInit) {
+                                setActiveQuickFilter(prev => (prev === "checkout" ? null : "checkout"));
+                              }
+                            }}
+                            role="button"
+                            aria-pressed={activeQuickFilter === "checkout"}
+                            className={cn(
+                              "flex items-center gap-1.5 rounded px-1",
+                              hasCheckoutInit ? "cursor-pointer" : "cursor-default opacity-60",
+                              activeQuickFilter === "checkout" ? "bg-white text-neutral-900" : ""
+                            )}
+                          >
+                            <CreditCard className={cn(
+                              "w-4 h-4",
+                              activeQuickFilter === "checkout"
+                                ? "text-neutral-900"
+                                : hasCheckoutInit
+                                  ? "text-green-400"
+                                  : "text-neutral-500"
+                            )} />
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <span>Checkout started (/plata-cos/)</span>
+                        </TooltipContent>
+                      </Tooltip>
+
+                      {/* Finalized if page contains /order-received/ */}
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div
+                            onClick={() => {
+                              if (hasOrderReceived) {
+                                setActiveQuickFilter(prev => (prev === "order" ? null : "order"));
+                              }
+                            }}
+                            role="button"
+                            aria-pressed={activeQuickFilter === "order"}
+                            className={cn(
+                              "flex items-center gap-1.5 rounded px-1",
+                              hasOrderReceived ? "cursor-pointer" : "cursor-default opacity-60",
+                              activeQuickFilter === "order" ? "bg-white text-neutral-900" : ""
+                            )}
+                          >
+                            <CheckCircle2 className={cn(
+                              "w-4 h-4",
+                              activeQuickFilter === "order"
+                                ? "text-neutral-900"
+                                : hasOrderReceived
+                                  ? "text-green-400"
+                                  : "text-neutral-500"
+                            )} />
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <span>Order finalized (/order-received/)</span>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
 
 
                     {!userId ? (
 
-                        <div className="flex items-center gap-2 mb-3 absolute right-0 top-0">
-                            <span className="text-xs text-neutral-400">Sort:</span>
-                            <Button
+                        <div className="flex items-center gap-2 mb-3 right-0 top-0">
+                          <CombinedRefresh isFetching={isFetching} onRefresh={refetch} />
+
+                          <span className="text-xs text-neutral-400">Sort:</span>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
                                 size="sm"
                                 variant={sortOrder === "desc" ? "default" : "outline"}
                                 onClick={() => setSortOrder("desc")}
-                            >
-                                Newest first
-                            </Button>
-                            <Button
+                                aria-label="Newest first"
+                                title="Newest first"
+                              >
+                                <SortDesc className="w-4 h-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <span>Newest first</span>
+                            </TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
                                 size="sm"
                                 variant={sortOrder === "asc" ? "default" : "outline"}
                                 onClick={() => setSortOrder("asc")}
-                            >
-                                Oldest first
-                            </Button>
+                                aria-label="Oldest first"
+                                title="Oldest first"
+                              >
+                                <SortAsc className="w-4 h-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <span>Oldest first</span>
+                            </TooltipContent>
+                          </Tooltip>
+                          <Link href={`/${site}/user/${session.user_id}`}>
+                                <Button size="sm" variant="success">
+                                    View User <ArrowRight className="w-4 h-4" />
+                                </Button>
+                            </Link>
+
+                        </div>
+
+                    ) : (
+                        <div className="flex items-center gap-2 ">
+                          <CombinedRefresh isFetching={isFetching} onRefresh={refetch} />
+
+                          <span className="text-xs text-neutral-400">Sort:</span>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="sm"
+                                variant={sortOrder === "desc" ? "default" : "outline"}
+                                onClick={() => setSortOrder("desc")}
+                                aria-label="Newest first"
+                                title="Newest first"
+                              >
+                                <SortDesc className="w-4 h-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <span>Newest first</span>
+                            </TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="sm"
+                                variant={sortOrder === "asc" ? "default" : "outline"}
+                                onClick={() => setSortOrder("asc")}
+                                aria-label="Oldest first"
+                                title="Oldest first"
+                              >
+                                <SortAsc className="w-4 h-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <span>Oldest first</span>
+                            </TooltipContent>
+                          </Tooltip>
+
                             <Link href={`/${site}/user/${session.user_id}`}>
                                 <Button size="sm" variant="success">
                                     View User <ArrowRight className="w-4 h-4" />
                                 </Button>
                             </Link>
-                            <CombinedRefresh isFetching={isFetching} onRefresh={refetch} />
-
-
-                        </div>
-
-
-                    ) : (
-                        <div className="flex items-center gap-2 mb-3 absolute right-0 top-0">
-                            <span className="text-xs text-neutral-400">Sort:</span>
-                            <Button
-                                size="sm"
-                                variant={sortOrder === "desc" ? "default" : "outline"}
-                                onClick={() => setSortOrder("desc")}
-                            >
-                                Newest first
-                            </Button>
-                            <Button
-                                size="sm"
-                                variant={sortOrder === "asc" ? "default" : "outline"}
-                                onClick={() => setSortOrder("asc")}
-                            >
-                                Oldest first
-                            </Button>
-                            
-                            <CombinedRefresh isFetching={isFetching} onRefresh={refetch} />
-
                         </div>
                     )}
                 </div>
 
 
+{/* Marketing identifiers bar (above Produse vizitate) */}
+{(() => {
+  // Build ordered list with counts and keep only those found
+  const items = MARKETING_IDENTIFIERS.map(m => ({
+    key: m.identificator,
+    name: m.name,
+    count: marketingCounts.get(m.identificator) || 0,
+  })).filter(it => it.count > 0);
+  const total = items.reduce((acc, it) => acc + it.count, 0);
+  if (total === 0) return null;
+  return (
+    <div className="mb-2 border border-neutral-800 rounded-lg p-2 bg-neutral-900">
+      <div className="text-[11px] text-neutral-400 mb-1">Identified Campaign Parameters</div>
+      <div className="flex items-center gap-2 flex-wrap">
+        {items.map(it => (
+          <button
+            key={it.key}
+            onClick={() => {
+              if (it.count > 0) setActiveMarketingId(prev => (prev === it.key ? null : it.key));
+            }}
+            className={cn(
+              "flex items-center gap-1.5 rounded px-2 py-1 text-xs border",
+              "cursor-pointer bg-neutral-800 border-neutral-700 hover:bg-neutral-700",
+              activeMarketingId === it.key ? "bg-white text-neutral-900 border-neutral-300" : ""
+            )}
+            aria-pressed={activeMarketingId === it.key}
+            title={it.name}
+          >
+            <MarketingIcon id={it.key} />
+            <span className="font-mono">{it.key}</span>
+            <Badge variant="outline" className={cn("h-5 px-1", activeMarketingId === it.key ? "bg-white text-neutral-900 border-neutral-300" : "bg-neutral-900 text-neutral-200")}>{it.count}</Badge>
+            <span className="text-neutral-400 hidden sm:inline">{it.name}</span>
+          </button>
+        ))}
+        {activeMarketingId && (
+          <button
+            onClick={() => setActiveMarketingId(null)}
+            className="ml-1 text-xs underline text-neutral-300"
+            title="Clear marketing filter"
+          >
+            Reset
+          </button>
+        )}
+      </div>
+    </div>
+  );
+})()}
 
+<div className="produseGasite mt-2">
+  {(() => {
+    // Group product pageviews by slug from the currently displayed (filtered) events
+    type Group = { count: number; indices: number[] };
+    const groups = new Map<string, Group>();
+    try {
+      filteredEvents.forEach((ev: SessionEvent, i: number) => {
+        if (ev.type === "pageview" && typeof ev.pathname === "string" && ev.pathname.includes("/produs/")) {
+          const m = ev.pathname.match(/\/produs\/([^\/?#]+)/);
+          if (m && m[1]) {
+            try {
+              const slug = decodeURIComponent(m[1]);
+              const g = groups.get(slug) || { count: 0, indices: [] };
+              g.count += 1;
+              g.indices.push(i);
+              groups.set(slug, g);
+            } catch {}
+          }
+        }
+      });
+    } catch {}
+
+    if (groups.size === 0) return null;
+
+    // Build items array and sort by count desc (interest). For ties, keep earliest occurrence first.
+    const items = Array.from(groups.entries()).map(([slug, g]) => ({ slug, count: g.count, indices: g.indices.sort((a,b)=>a-b) }));
+    items.sort((a, b) => {
+      if (b.count !== a.count) return b.count - a.count;
+      return a.indices[0] - b.indices[0];
+    });
+
+    return (
+      <div className="border border-1 border-neutral-800 rounded-xl p-1 bg-neutral-900 mb-3">
+        <div className="flex gap-3 overflow-x-auto py-2 pr-1">
+          {items.map((item) => {
+            const firstIndex = item.indices[0];
+            if (item.count > 1) {
+              // Multiple visits: green border + count badge, no scroll on click
+              const inCart = addedToCartSlugs.has(item.slug);
+              return (
+                <div
+                  key={`${item.slug}`}
+                  className={`relative shrink-0  rounded-md border-2 ${inCart ? "border-green-500" : "border-yellow-500"} cursor-default`}
+                  title={`Vizitat de ${item.count} ori`}
+                >
+
+                  <div className="relative inline-block w-12 h-12">
+                    <ProductBadge slug={item.slug} imageOnly />
+                    {inCart && (
+                      <>
+                        <div className="pointer-events-none absolute inset-0 rounded bg-green-500/25" />
+                        <div className="pointer-events-none absolute -top-1 -left-1 bg-green-600 text-white rounded-full p-0.5 border border-green-300">
+                          <ShoppingCart className="w-3 h-3" />
+                        </div>
+                      </>
+                    )}
+                  </div>
+                    <span className="absolute -top-1 -right-1 bg-green-600 text-white text-[10px] px-1.5 py-0.5 rounded-full border border-green-300 leading-none z-0" >
+                    {item.count}
+                  </span>
+                </div>
+              );
+            }
+            // Single visit: clickable button that scrolls to the pageview
+            return (
+              <button
+                key={`${item.slug}-${firstIndex}`}
+                onClick={() => {
+                  const el = document.getElementById(`pv-${firstIndex}`);
+                  if (el) {
+                    el.scrollIntoView({ behavior: "smooth", block: "center" });
+                  }
+                }}
+                className="shrink-0 bg-transparent border-0 p-0 text-left cursor-pointer"
+                title={`Go to pageview #${sortOrder === "asc" ? firstIndex + 1 : filteredEvents.length - firstIndex}`}
+              >
+                <div className="relative inline-block w-12 h-12">
+                  <ProductBadge slug={item.slug} imageOnly />
+                  {addedToCartSlugs.has(item.slug) && (
+                    <>
+                      <div className="pointer-events-none absolute inset-0 rounded bg-green-500/25" />
+                      <div className="pointer-events-none absolute -top-1 -right-1 bg-green-600 text-white rounded-full p-0.5 border border-green-300">
+                        <ShoppingCart className="w-3 h-3" />
+                      </div>
+                    </>
+                  )}
+                </div>
+                {/*<div className="text-[10px] text-neutral-400 mt-1 text-center">#{sortOrder === "asc" ? firstIndex + 1 : filteredEvents.length - firstIndex}</div>*/}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  })()}
+</div>
 
               {searchQuery && searchQuery.trim() && (
                 <div className="text-xs text-neutral-400 mb-2">
@@ -670,6 +1450,7 @@ export function SessionDetails({ session, userId, searchQuery }: SessionDetailsP
                     isLast={index === filteredEvents.length - 1 && !hasNextPage}
                     nextTimestamp={nextTimestamp}
                     displayNumber={displayNumber}
+                    anchorId={`pv-${index}`}
                   />
                 );
               })}
@@ -708,4 +1489,153 @@ export function SessionDetails({ session, userId, searchQuery }: SessionDetailsP
       )}
     </div>
   );
+}
+
+
+// Small component to render a product badge when a /produs/{slug} URL is detected in event props
+function ProductBadge({ slug, imageOnly = false }: { slug: string; imageOnly?: boolean }) {
+  const [productInfo, setProductInfo] = useState<null | {
+    ok?: boolean;
+    product_id?: number;
+    slug?: string;
+    nume?: string;
+    pret?: number;
+    pret_regular?: number;
+    pret_redus?: number;
+    vanzari?: number;
+    comentarii?: number;
+    poza?: string;
+    excerpt?: string;
+    status?: string;
+  }>(null);
+  const [productLoading, setProductLoading] = useState<boolean>(false);
+  const [productError, setProductError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let aborted = false;
+    async function run() {
+      try {
+        setProductLoading(true);
+        setProductError(null);
+        const data = await fetchProductInfoWithCache(slug);
+        if (!aborted) setProductInfo(data);
+      } catch (e: any) {
+        if (!aborted) setProductError(e?.message || "Failed to load product");
+      } finally {
+        if (!aborted) setProductLoading(false);
+      }
+    }
+    run();
+    return () => {
+      aborted = true;
+    };
+  }, [slug]);
+
+  if (productLoading) {
+    return (
+      <span className="inline-flex items-center gap-2 text-xs text-neutral-400">
+        <Loader2 className="w-3 h-3 animate-spin" />
+        <span>Loading product…</span>
+      </span>
+    );
+  }
+
+  if (productError) {
+    return <span className="text-[11px] text-red-400">{productError}</span>;
+  }
+
+  if (!productInfo || !productInfo.ok) {
+    return null;
+  }
+
+  // If only the image is requested (for "Produse vizitate"), render just the thumbnail
+  if (imageOnly) {
+    return (
+      <>
+        {productInfo.poza ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={productInfo.poza} alt={productInfo.nume || productInfo.slug || slug} className="w-12 h-12 object-cover rounded" />
+        ) : (
+          <div className="w-12 h-12 bg-neutral-800 rounded" />
+        )}
+      </>
+    );
+  }
+
+  return (
+    <div className="inline-flex items-center gap-3 p-2 border border-neutral-800 rounded-md bg-neutral-900/50">
+      {productInfo.poza ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={productInfo.poza} alt={productInfo.nume || productInfo.slug || slug} className="w-10 h-10 object-cover rounded" />
+      ) : (
+        <div className="w-10 h-10 bg-neutral-800 rounded" />
+      )}
+      <div className="min-w-0">
+        <div className="text-[11px] text-neutral-200 font-medium truncate max-w-[220px]" title={productInfo.nume || productInfo.slug || slug}>
+          {productInfo.nume || productInfo.slug || slug}
+        </div>
+        <div className="text-[11px] text-neutral-300 mt-0.5 flex items-center gap-2">
+          {typeof productInfo.pret_regular === "number" && productInfo.pret_redus && productInfo.pret_redus < productInfo.pret_regular ? (
+            <>
+              <span className="line-through text-neutral-500">{productInfo.pret_regular} RON</span>
+              <span className="text-green-400 font-semibold">{productInfo.pret_redus} RON</span>
+            </>
+          ) : (
+            <span className="text-neutral-200 font-semibold">{productInfo.pret ?? productInfo.pret_redus ?? ""} {productInfo.pret || productInfo.pret_redus ? "RON" : ""}</span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+// In-memory cache for product info by slug to avoid repeated API calls
+// Cached for the lifetime of the page; only successful responses are cached.
+type ProductApiResponse = {
+  ok?: boolean;
+  product_id?: number;
+  slug?: string;
+  nume?: string;
+  pret?: number;
+  pret_regular?: number;
+  pret_redus?: number;
+  vanzari?: number;
+  comentarii?: number;
+  poza?: string;
+  excerpt?: string;
+  status?: string;
+};
+
+const productCache = new Map<string, ProductApiResponse>();
+const productPromiseCache = new Map<string, Promise<ProductApiResponse>>();
+
+async function fetchProductInfoWithCache(slug: string): Promise<ProductApiResponse> {
+  const key = slug.trim();
+  if (!key) return {};
+
+  // Return from cache if present
+  const cached = productCache.get(key);
+  if (cached) return cached;
+
+  // Deduplicate in-flight requests
+  const inflight = productPromiseCache.get(key);
+  if (inflight) return inflight;
+
+  const promise = (async () => {
+    const res = await fetch(`https://crm.actium.ro/api/identificare-produs/${encodeURIComponent(key)}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data: ProductApiResponse = await res.json();
+    if (data && data.ok) {
+      productCache.set(key, data);
+    }
+    return data;
+  })()
+    .finally(() => {
+      // Clean up the in-flight marker regardless of success/failure
+      productPromiseCache.delete(key);
+    });
+
+  productPromiseCache.set(key, promise);
+  return promise;
 }
