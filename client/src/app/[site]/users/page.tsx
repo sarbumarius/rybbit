@@ -15,7 +15,7 @@ import { Avatar } from "../../../components/Avatar";
 import { SessionDetails } from "../../../components/Sessions/SessionDetails";
 import { Badge } from "../../../components/ui/badge";
 import { formatter } from "../../../lib/utils";
-import { FileText, MousePointerClick, Rewind, RefreshCw, Loader2, TriangleAlert, ChevronDown, User, Fingerprint, MapPin, Monitor, Smartphone, Tablet, Globe } from "lucide-react";
+import { FileText, MousePointerClick, Rewind, RefreshCw, Loader2, TriangleAlert, ChevronDown, User, Fingerprint, MapPin, Monitor, Smartphone, Tablet, Globe, Gift, ShoppingCart, CreditCard, CheckCircle2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../components/ui/select";
 
 
@@ -60,7 +60,7 @@ function CombinedRefresh({ isFetching, onRefresh }: { isFetching: boolean; onRef
 }
 
 export default function UsersPage() {
-  useSetPageTitle("Rybbit · Users");
+  useSetPageTitle("scørix · Users");
 
   const { site } = useParams();
 
@@ -74,9 +74,6 @@ export default function UsersPage() {
     pageIndex: 0,
     pageSize: 50,
   });
-
-  // Map sidebar sort to table/react-query sort state
-  const sorting: SortingState = [{ id: sidebarSort.key, desc: sidebarSort.order === "desc" }];
 
   // Convert page index to 1-based for the API
   const page = pagination.pageIndex + 1;
@@ -255,7 +252,12 @@ export default function UsersPage() {
                               {u.ip}
                             </div>
                           ) : null}
-                          <div className="mt-2 flex items-center gap-1 text-[10px] text-neutral-300">
+
+
+
+                          <div className="mt-2 grid grid-cols-4 gap-1 text-[10px] text-neutral-300">
+
+                              
                             <Badge variant="outline" className="h-5 px-1 gap-1 bg-neutral-800 text-neutral-200">
                               <FileText className="w-3 h-3 text-blue-500" />
                               {formatter(u.pageviews)}
@@ -268,10 +270,87 @@ export default function UsersPage() {
                               <Rewind className="w-3 h-3 text-green-500" />
                               {formatter(u.sessions)}
                             </Badge>
+                              {u.device_type ? (
+                                  <Badge
+                                      variant="outline"
+                                      className="h-5 px-1 gap-1 text-neutral-200 m-auto border-0"
+                                      title={`Device: ${u.device_type}`}
+                                  >
+                                      {u.device_type === "Mobile" ? (
+                                          <Smartphone className="w-3 h-3 text-neutral-300" />
+                                      ) : u.device_type === "Tablet" ? (
+                                          <Tablet className="w-3 h-3 text-neutral-300" />
+                                      ) : (
+                                          <Monitor className="w-3 h-3 text-neutral-300" />
+                                      )}
+
+                                  </Badge>
+                              ) : null}
+                          </div>
+                          <div className="mt-2">
+                            <div className={`flex items-center gap-1 border border-1 ${u.has_purchase ? "border-green-400" : u.has_begin_checkout ? "border-amber-400" : u.has_add_to_cart ? "border-blue-400" : "border-neutral-700"} ps-1 pe-1 rounded-xl pt-1 pb-1 filterMaster`}>
+                              {/* Products visited */}
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <div className="flex items-center gap-1.5 rounded px-1 cursor-default">
+                                      <Gift className={(u.products_pageviews ?? 0) > 0 ? "w-4 h-4 text-green-400" : "w-4 h-4 text-neutral-500"} />
+                                      <Badge variant="outline" className={(u.products_pageviews ?? 0) > 0 ? "h-4 px-1 text-neutral-200 bg-neutral-800" : "h-5 px-1 text-neutral-400 bg-neutral-900"}>
+                                        {u.products_pageviews ?? 0}
+                                      </Badge>
+                                    </div>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <span>Visited products (/produs/)</span>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+
+                              {/* Add to cart */}
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <div className="flex items-center gap-1.5 rounded px-1 cursor-default">
+                                      <ShoppingCart className={u.has_add_to_cart ? "w-4 h-4 text-green-400" : "w-4 h-4 text-neutral-500"} />
+                                    </div>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <span>Add to cart</span>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+
+                              {/* Checkout started */}
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <div className="flex items-center gap-1.5 rounded px-1 cursor-default">
+                                      <CreditCard className={u.has_begin_checkout ? "w-4 h-4 text-green-400" : "w-4 h-4 text-neutral-500"} />
+                                    </div>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <span>Checkout started (/plata-cos/)</span>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+
+                              {/* Order finalized */}
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <div className="flex items-center gap-1.5 rounded px-1 cursor-default">
+                                      <CheckCircle2 className={u.has_purchase ? "w-4 h-4 text-green-400" : "w-4 h-4 text-neutral-500"} />
+                                    </div>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <span>Order finalized (/order-received/)</span>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </div>
                           </div>
                           <div className="mt-1 text-[10px] text-neutral-400 flex items-center gap-2">
                             {u.city ? <span title="City" className="truncate max-w-[8rem]">{u.city}</span> : null}
-                            {u.device_type ? <span title="Device">{u.device_type}</span> : null}
                           </div>
                           <div className="mt-1 text-[10px] text-neutral-500">
                             <TooltipProvider>

@@ -14,7 +14,7 @@ import { DisabledOverlay } from "../../../components/DisabledOverlay";
 import { MobileSidebar } from "../components/Sidebar/MobileSidebar";
 
 export default function RealtimePage() {
-  useSetPageTitle("Rybbit · Realtime");
+  useSetPageTitle("scørix · Realtime");
   const [ref, { width }] = useMeasure();
 
   const [minutes, setMinutes] = useAtom(minutesAtom);

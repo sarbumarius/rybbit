@@ -20,7 +20,7 @@ import { MobileSidebar } from "../components/Sidebar/MobileSidebar";
 const MAX_LINK_HEIGHT = 100;
 
 export default function JourneysPage() {
-  useSetPageTitle("Rybbit · Journeys");
+  useSetPageTitle("scørix · Journeys");
 
   const [steps, setSteps] = useState<number>(3);
   const [maxJourneys, setMaxJourneys] = useState<number>(25);

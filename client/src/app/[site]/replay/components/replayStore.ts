@@ -6,6 +6,10 @@ interface ActivityPeriod {
 }
 
 export const useReplayStore = create<{
+  // Optional user filter for replay list
+  selectedUserId?: string;
+  setSelectedUserId: (userId?: string) => void;
+
   minDuration: number;
   setMinDuration: (minDuration: number) => void;
 
@@ -36,6 +40,9 @@ export const useReplayStore = create<{
   // Reset all player state when session changes
   resetPlayerState: () => void;
 }>(set => ({
+  selectedUserId: undefined,
+  setSelectedUserId: (selectedUserId?: string) => set({ selectedUserId }),
+
   minDuration: 30,
   setMinDuration: minDuration => set({ minDuration }),
 

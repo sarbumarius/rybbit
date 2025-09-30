@@ -1250,8 +1250,9 @@ export function SessionDetails({ session, userId, searchQuery }: SessionDetailsP
                             </TooltipContent>
                           </Tooltip>
                           <Link href={`/${site}/user/${session.user_id}`}>
-                                <Button size="sm" variant="success">
-                                    View User <ArrowRight className="w-4 h-4" />
+                                <Button size="sm" variant="success" aria-label="View User">
+                                    <User className="w-4 h-4" />
+                                    <ArrowRight className="w-4 h-4" />
                                 </Button>
                             </Link>
 
@@ -1296,8 +1297,9 @@ export function SessionDetails({ session, userId, searchQuery }: SessionDetailsP
                           </Tooltip>
 
                             <Link href={`/${site}/user/${session.user_id}`}>
-                                <Button size="sm" variant="success">
-                                    View User <ArrowRight className="w-4 h-4" />
+                                <Button size="sm" variant="success" aria-label="View User">
+                                    <User className="w-4 h-4" />
+                                    <ArrowRight className="w-4 h-4" />
                                 </Button>
                             </Link>
                         </div>

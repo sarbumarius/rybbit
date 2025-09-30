@@ -163,7 +163,7 @@ function Organization({
 
 // Main Organizations component
 export default function MembersPage() {
-  useSetPageTitle("Rybbit · Organization Members");
+  useSetPageTitle("scørix · Organization Members");
   const { data: activeOrganization, isPending } = authClient.useActiveOrganization();
 
   if (isPending) {

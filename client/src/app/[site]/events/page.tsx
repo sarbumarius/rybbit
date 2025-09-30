@@ -14,7 +14,7 @@ import { OutboundLinksList } from "./components/OutboundLinksList";
 import { useMemo, useState } from "react";
 
 export default function EventsPage() {
-  useSetPageTitle("Rybbit · Events");
+  useSetPageTitle("scørix · Events");
 
   const { data: eventNamesData, isLoading: isLoadingEventNames } = useGetEventNames();
   const { data: outboundLinksData, isLoading: isLoadingOutboundLinks } = useGetOutboundLinks();

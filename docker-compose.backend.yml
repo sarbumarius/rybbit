@@ -1,0 +1,24 @@
+services:
+  backend:
+    container_name: backend
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    image: rybbit-backend:dev
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: development
+
+      # 🔹 ClickHouse config
+      CLICKHOUSE_URL: http://default:frog@clickhouse:8123/analytics
+      CLICKHOUSE_DB: analytics
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: frog
+
+      # 🔹 Postgres config
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: analytics
+      POSTGRES_USER: frog
+      POSTGRES_PASSWORD: frog

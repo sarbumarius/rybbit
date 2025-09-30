@@ -23,7 +23,7 @@ export function DemoSignupBanner() {
         <span>Enjoying the demo? Get started with your own analytics dashboard!</span>
       </div>
       <Button variant="success" size="sm" asChild>
-        <Link href="https://app.rybbit.io/signup" target="_blank" rel="noopener">
+        <Link href="https://scorix.ro/signup" target="_blank" rel="noopener">
           Sign Up <ArrowRight className="ml-1 h-3 w-3" />
         </Link>
       </Button>

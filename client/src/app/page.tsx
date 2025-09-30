@@ -16,7 +16,7 @@ import { authClient } from "../lib/auth";
 import { AddSite } from "./components/AddSite";
 
 export default function Home() {
-  useSetPageTitle("Rybbit · Home");
+  useSetPageTitle("scørix · Home");
 
   const { data: activeOrganization, isPending } = authClient.useActiveOrganization();
 

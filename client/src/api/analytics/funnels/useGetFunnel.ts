@@ -36,6 +36,11 @@ export type FunnelResponse = {
   visitors: number;
   conversion_rate: number;
   dropoff_rate: number;
+  details?: {
+    type: "page" | "event";
+    items: { label: string; users: number }[];
+    entries?: { label: string; session_id: string; user_id: string; timestamp: string; type: string }[];
+  };
 };
 
 /**

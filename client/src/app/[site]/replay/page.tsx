@@ -15,11 +15,11 @@ import { useReplayStore } from "./components/replayStore";
 import { Video } from "lucide-react";
 
 export default function SessionReplayPage() {
-  useSetPageTitle("Rybbit · Session Replay");
+  useSetPageTitle("scørix · Session Replay");
 
-  const { minDuration } = useReplayStore();
+  const { minDuration, selectedUserId } = useReplayStore();
 
-  const { data, isLoading } = useGetSessionReplays({ minDuration });
+  const { data, isLoading } = useGetSessionReplays({ minDuration, userId: selectedUserId });
 
   const hasNoReplays = !isLoading && !data?.pages[0].data?.length;
 
@@ -38,6 +38,7 @@ export default function SessionReplayPage() {
           />
         ) : (
           <div className="grid grid-cols-[200px_1fr_300px] gap-3">
+
             <ReplayList />
             <div ref={ref} className="w-[calc(min(100vw, 2000px)-780px)]">
               {resolvedWidth && resolvedHeight && <ReplayPlayer width={resolvedWidth} height={resolvedHeight - 1} />}

@@ -28,6 +28,11 @@ type FunnelResponse = {
   visitors: number;
   conversion_rate: number;
   dropoff_rate: number;
+  details?: {
+    type: "page" | "event";
+    items: { label: string; users: number }[];
+    entries?: { label: string; session_id: string; user_id: string; timestamp: string; type: "pageview" | "custom_event" | string }[];
+  };
 };
 
 export async function getFunnel(
@@ -104,6 +109,7 @@ export async function getFunnel(
     UserActions AS (
       SELECT
         user_id,
+        session_id,
         timestamp,
         pathname,
         event_name,
@@ -193,6 +199,117 @@ export async function getFunnel(
 
     // Process the results
     const data = await processResults<FunnelResponse>(result);
+
+    // Enrich with small details list per step (top matched pages/actions)
+    try {
+      const detailsPromises = steps.map(async (step, idx) => {
+        const stepIndex = idx + 1;
+        // Rebuild partial CTEs up to this step
+        const partialCTE = `
+    WITH
+    UserActions AS (
+      SELECT
+        user_id,
+        session_id,
+        timestamp,
+        pathname,
+        event_name,
+        type,
+        props
+      FROM events
+      WHERE
+        site_id = {siteId:Int32}
+        ${timeStatement}
+        ${filterConditions}
+        AND user_id != ''
+    ),
+    Step1 AS (
+      SELECT DISTINCT
+        user_id,
+        min(timestamp) as step_time
+      FROM UserActions
+      WHERE ${stepConditions[0]}
+      GROUP BY user_id
+    )
+    ${steps
+      .slice(1, stepIndex)
+      .map(
+        (s, i) => `
+    , Step${i + 2} AS (
+      SELECT DISTINCT
+        s${i + 1}.user_id,
+        min(ua.timestamp) as step_time
+      FROM Step${i + 1} s${i + 1}
+      JOIN UserActions ua ON s${i + 1}.user_id = ua.user_id
+      WHERE 
+        ua.timestamp > s${i + 1}.step_time
+        AND ${stepConditions[i + 1]}
+      GROUP BY s${i + 1}.user_id
+    )
+    `
+      )
+      .join("")}
+    `;
+
+        let labelExpr = "";
+        if (step.type === "page") {
+          labelExpr = "pathname";
+        } else {
+          if (step.eventPropertyKey) {
+            const propAccessor = `props.${SqlString.escapeId(step.eventPropertyKey)}`;
+            labelExpr = `concat(event_name, ' ', toString(${propAccessor}))`;
+          } else {
+            labelExpr = "event_name";
+          }
+        }
+
+        const detailsQuery = `${partialCTE}
+    SELECT ${labelExpr} AS label, countDistinct(s.user_id) AS users
+    FROM Step${stepIndex} s
+    JOIN UserActions ua ON s.user_id = ua.user_id AND ua.timestamp = s.step_time
+    GROUP BY label
+    ORDER BY users DESC
+    LIMIT 5`;
+
+        const res = await clickhouse.query({
+          query: detailsQuery,
+          format: "JSONEachRow",
+          query_params: { siteId: Number(site) },
+        });
+        const items = await processResults<{ label: string; users: number }>(res);
+
+        // Detailed entries: individual pages/actions with session and user context
+        const entriesQuery = `${partialCTE}
+    SELECT 
+      ${labelExpr} AS label,
+      ua.session_id AS session_id,
+      ua.user_id AS user_id,
+      ua.timestamp AS timestamp,
+      ua.type AS type
+    FROM Step${stepIndex} s
+    JOIN UserActions ua ON s.user_id = ua.user_id AND ua.timestamp = s.step_time
+    ORDER BY ua.timestamp
+    LIMIT 15000`;
+
+        const resEntries = await clickhouse.query({
+          query: entriesQuery,
+          format: "JSONEachRow",
+          query_params: { siteId: Number(site) },
+        });
+        const entries = await processResults<{ label: string; session_id: string; user_id: string; timestamp: string; type: string }>(resEntries);
+
+        return { type: step.type, items, entries } as FunnelResponse["details"];
+      });
+
+      const details = await Promise.all(detailsPromises);
+      for (let i = 0; i < data.length; i++) {
+        data[i].details = details[i];
+      }
+    } catch (e) {
+      // Non-fatal: if details computation fails, continue with base data
+      // console.error('Failed to compute funnel details', e);
+    }
+
     return reply.send({ data });
   } catch (error) {
     console.error("Error executing funnel query:", error);

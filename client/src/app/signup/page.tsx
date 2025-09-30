@@ -44,7 +44,7 @@ function StepHandler({ onSetStep }: { onSetStep: (step: number) => void }) {
 
 export default function SignupPage() {
   const { configs, isLoading: isLoadingConfigs } = useConfigs();
-  useSetPageTitle("Rybbit · Signup");
+  useSetPageTitle("scørix · Signup");
 
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
@@ -329,7 +329,7 @@ export default function SignupPage() {
       <div className="flex justify-center items-center h-dvh w-full">
         <Card className="w-full max-w-sm p-1">
           <CardHeader>
-            <Image src="/rybbit.svg" alt="Rybbit" width={32} height={32} />
+            <Image src="/scorix.png" alt="scørix" className="m-auto" width={32} height={32} />
             <CardTitle className="text-2xl flex justify-center">Sign Up Disabled</CardTitle>
           </CardHeader>
           <CardContent>
@@ -367,10 +367,10 @@ export default function SignupPage() {
 
         {/* Logo and title above the card */}
         <div className="relative z-10 mb-6 text-center">
-          <a href="https://rybbit.io" target="_blank" className="inline-block mb-2">
-            <Image src="/rybbit-text.svg" alt="Rybbit" width={150} height={34} />
+          <a href="https://scorix.ro" target="_blank" className="inline-block mb-2">
+            <Image src="/scorix.png" alt="Rybbit" width={100} height={34} />
           </a>
-          <h1 className="text-lg text-neutral-300">Get started with Rybbit</h1>
+          <h1 className="text-lg text-neutral-300">Get started with scørix</h1>
         </div>
 
         <Card className="w-full md:w-[500px] p-0 overflow-hidden shadow-2xl border-neutral-700/50 backdrop-blur-sm bg-neutral-800/20 z-10 p-8">
@@ -412,12 +412,12 @@ export default function SignupPage() {
         {!IS_CLOUD && (
           <div className="text-xs text-muted-foreground relative z-10 mt-8">
             <a
-              href="https://rybbit.io"
+              href="https://scorix.ro"
               target="_blank"
               rel="noopener"
-              title="Rybbit - Open Source Privacy-Focused Web Analytics"
+              title="scørix - Open Source Privacy-Focused Web Analytics"
             >
-              Open source web analytics powered by Rybbit
+              Open source web analytics powered by scørix
             </a>
           </div>
         )}

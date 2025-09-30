@@ -1,0 +1,26 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# 1. Instalăm dependențele pentru shared și server
+COPY shared/package*.json ./shared/
+COPY server/package*.json ./server/
+
+WORKDIR /app/shared
+RUN npm install
+
+WORKDIR /app/server
+RUN npm install
+
+# 2. Copiem sursa (abia după ce avem node_modules cache-uite)
+COPY shared ./shared
+COPY server ./server
+
+# 3. Build pentru shared (asigură-te că ai tsconfig.json în shared/)
+WORKDIR /app/shared
+RUN npm run build
+
+# 4. Pornim serverul în dev
+WORKDIR /app/server
+EXPOSE 3001
+CMD ["npm", "run", "dev"]

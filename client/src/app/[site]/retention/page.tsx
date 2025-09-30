@@ -63,7 +63,7 @@ const getRetentionColor = (percentage: number | null): { backgroundColor: string
 };
 
 export default function RetentionPage() {
-  useSetPageTitle("Rybbit · Retention");
+  useSetPageTitle("scørix · Retention");
 
   // State for the retention mode (day or week)
   const [mode, setMode] = useState<RetentionMode>("week");

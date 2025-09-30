@@ -14,3 +14,4 @@ services:
       - NEXT_PUBLIC_DISABLE_SIGNUP=${DISABLE_SIGNUP}
     ports:
       - "3003:3002"
+

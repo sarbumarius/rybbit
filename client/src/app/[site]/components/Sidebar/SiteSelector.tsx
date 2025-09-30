@@ -36,11 +36,11 @@ function SiteSelectorContent({ onSiteSelect }: { onSiteSelect: () => void }) {
           {[
             {
               siteId: 21,
-              domain: "rybbit.io",
+              domain: "scorix.ro",
             },
             {
               siteId: 1,
-              domain: "tomato.gg",
+              domain: "darurialese.com",
             },
           ].map(site => {
             const isSelected = site.siteId === currentSiteId;

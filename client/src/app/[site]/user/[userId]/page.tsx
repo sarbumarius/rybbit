@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import SessionsList from "@/components/Sessions/SessionsList";
 import {
   ArrowLeft,
@@ -32,7 +33,7 @@ import { MobileSidebar } from "../../components/Sidebar/MobileSidebar";
 import { Badge } from "../../../../components/ui/badge";
 
 export default function UserPage() {
-  useSetPageTitle("Rybbit · User");
+  useSetPageTitle("scørix · User");
 
   const router = useRouter();
   const { userId } = useParams();

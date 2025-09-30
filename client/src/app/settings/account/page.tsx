@@ -5,7 +5,7 @@ import { authClient } from "../../../lib/auth";
 import { AccountInner } from "./components/AccountInner";
 
 export default function AccountPage() {
-  useSetPageTitle("Rybbit · Account");
+  useSetPageTitle("scørix · Account");
   const session = authClient.useSession();
 
   return (

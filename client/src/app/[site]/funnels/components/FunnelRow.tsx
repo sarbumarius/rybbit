@@ -103,8 +103,9 @@ export function FunnelRow({ funnel }: FunnelRowProps) {
         >
           <div className="mt-1 text-xs text-neutral-400 flex flex-col gap-3">
             {/* Steps visualization */}
-            <div className="flex flex-wrap gap-1">
               <h3 className="font-medium text-neutral-100 text-base mr-2">{funnel.name}</h3>
+
+              <div className="flex flex-wrap gap-1">
               {funnel.steps.map((step, index) => (
                 <div key={index} className="flex items-center">
                   {index > 0 && <ArrowRight className="h-3 w-3 mx-1 text-neutral-400" />}

@@ -15,11 +15,27 @@ export type UsersResponse = {
   browser: string;
   operating_system: string;
   device_type: string;
+  // Optional screen details and referrer
+  screen_width?: number;
+  screen_height?: number;
+  referrer?: string;
+  // Aggregates
   pageviews: number;
   events: number;
   sessions: number;
   last_seen: string;
   first_seen: string;
+  // Aggregated items across all sessions
+  pageviews_items?: string[]; // full URLs with query params
+  actions_items?: string[];   // custom event names
+  // Ecommerce-related aggregates
+  products_pageviews?: number;
+  add_to_cart_events?: number;
+  has_products?: boolean;
+  has_add_to_cart?: boolean;
+  has_begin_checkout?: boolean;
+  has_purchase?: boolean;
+  // Optional IP (may be unavailable)
   ip?: string;
 };
 

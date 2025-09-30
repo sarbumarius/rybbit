@@ -12,7 +12,7 @@ import { AuthButton } from "@/components/auth/AuthButton";
 import { AuthError } from "@/components/auth/AuthError";
 
 export default function ResetPasswordPage() {
-  useSetPageTitle("Rybbit · Reset Password");
+  useSetPageTitle("scørix · Reset Password");
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>();
@@ -83,7 +83,7 @@ export default function ResetPasswordPage() {
     <div className="flex justify-center items-center h-dvh w-full p-4">
       <Card className="w-full max-w-sm p-1">
         <CardHeader>
-          <Image src="/rybbit.svg" alt="Rybbit" width={32} height={32} />
+          <Image src="/scorix.png" alt="scørix" width={32} height={32} />
           <CardTitle className="text-2xl flex justify-center">
             {resetSuccess ? "Password Reset Successful" : otpSent ? "Enter OTP Code" : "Reset Password"}
           </CardTitle>

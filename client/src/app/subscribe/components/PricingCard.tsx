@@ -21,7 +21,7 @@ export function PricingCard({ isLoggedIn }: { isLoggedIn: boolean }) {
   async function handleSubscribe(planType: "standard" | "pro"): Promise<void> {
     // Handle custom tier by redirecting to email contact
     if (eventLimit === "Custom") {
-      window.location.href = "https://www.rybbit.io/contact";
+      window.location.href = "https://www.scorix.ro/contact";
       return;
     }
 
@@ -282,7 +282,7 @@ export function PricingCard({ isLoggedIn }: { isLoggedIn: boolean }) {
 
       {/* Footer text */}
       <p className="text-center text-sm text-neutral-400 mt-6">
-        {isCustomTier ? "Email us at hello@rybbit.io for custom pricing" : "Secure checkout powered by Stripe."}
+        {isCustomTier ? "Email us at hello@scorix.ro for custom pricing" : "Secure checkout powered by Stripe."}
       </p>
     </div>
   );

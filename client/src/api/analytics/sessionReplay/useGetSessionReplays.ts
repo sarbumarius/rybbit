@@ -30,19 +30,25 @@ export interface SessionReplayListResponse {
 type UseGetSessionReplaysOptions = {
   limit?: number;
   minDuration?: number;
+  userId?: string;
 };
 
-export function useGetSessionReplays({ limit = 20, minDuration = 30 }: UseGetSessionReplaysOptions = {}) {
+export function useGetSessionReplays({ limit = 20, minDuration = 30, userId }: UseGetSessionReplaysOptions = {}) {
   const { time, site, filters } = useStore();
 
+  // Merge store filters with optional userId filter
+  const mergedFilters = userId
+    ? ([...(filters || []), { parameter: "user_id", type: "equals", value: [userId] }] as any)
+    : filters;
+
   return useInfiniteQuery({
-    queryKey: ["session-replays", site, time, filters, limit, minDuration],
+    queryKey: ["session-replays", site, time, mergedFilters, limit, minDuration, userId],
     queryFn: async ({ pageParam = 0 }) => {
       const queryParams = {
         ...getQueryParams(time),
         limit,
         offset: pageParam,
-        filters,
+        filters: mergedFilters,
         minDuration,
       };
 

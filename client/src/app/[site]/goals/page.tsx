@@ -13,7 +13,7 @@ import GoalsList from "./components/GoalsList";
 import { Target } from "lucide-react";
 
 export default function GoalsPage() {
-  useSetPageTitle("Rybbit · Goals");
+  useSetPageTitle("scørix · Goals");
 
   const { site } = useStore();
   const [pagination, setPagination] = useState({

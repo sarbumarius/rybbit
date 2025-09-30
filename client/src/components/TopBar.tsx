@@ -20,9 +20,11 @@ export function TopBar() {
     <div className="flex py-2 pr-3 pl-6 items-center w-full  bg-neutral-950 justify-center border-b border-neutral-750">
       <div className="flex items-center justify-between flex-1">
         <div className="flex items-center space-x-4">
-          <Link href={session ? "/" : "https://rybbit.io"}>
-            <Image src="/rybbit-text.svg" alt="Rybbit" width={100} height={22} />
+          <Link href={session ? "/" : "https://scorix.ro"}>
+            <Image src="/scorix.png" alt="Scorix" width={25} height={25} className="rotate-90" />
+
           </Link>
+            <div className="text-2xl">scørix</div>
         </div>
         {session ? (
           <DropdownMenu>
@@ -64,7 +66,7 @@ export function TopBar() {
           <Link
             href={
               typeof window !== "undefined" && globalThis.location.hostname === DEMO_HOSTNAME
-                ? "https://app.rybbit.io/signup"
+                ? "https://scorix.ro/signup"
                 : "/signup"
             }
             passHref

@@ -22,7 +22,7 @@ function AuthComponent() {
   return (
     <Card className="w-full max-w-md p-1">
       <CardHeader>
-        <Image src="/rybbit.svg" alt="Rybbit" width={32} height={32} />
+        <Image src="/scorix.png" alt="scørix" width={32} height={32} />
         <CardTitle className="text-2xl flex justify-center">Join {organization}</CardTitle>
         <p className="text-center text-sm text-muted-foreground mt-2">You've been invited by {inviterEmail}</p>
       </CardHeader>
@@ -76,7 +76,7 @@ function AcceptInvitationInner() {
   return (
     <Card className="w-full max-w-md">
       <CardHeader>
-        <Image src="/rybbit.svg" alt="Rybbit" width={32} height={32} />
+        <Image src="/scorix.png" alt="scørix" width={32} height={32} />
         <CardTitle className="text-2xl flex justify-center">Invitation</CardTitle>
       </CardHeader>
       <CardContent>

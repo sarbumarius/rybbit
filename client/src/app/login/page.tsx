@@ -16,7 +16,7 @@ import { SocialButtons } from "@/components/auth/SocialButtons";
 
 export default function Page() {
   const { configs, isLoading: isLoadingConfigs } = useConfigs();
-  useSetPageTitle("Rybbit · Login");
+  useSetPageTitle("scørix · Login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -54,8 +54,8 @@ export default function Page() {
       <div></div>
       <Card className="w-full max-w-sm p-1">
         <CardHeader>
-          <Image src="/rybbit.svg" alt="Rybbit" width={32} height={32} />
-          <CardTitle className="text-2xl flex justify-center">Sign in</CardTitle>
+          <Image src="/scorix.png" alt="scørix" className="m-auto" width={52} height={32} />
+          {/*<CardTitle className="text-2xl flex justify-center">Sign in now</CardTitle>*/}
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit}>
@@ -107,12 +107,12 @@ export default function Page() {
       </Card>
       <div className="text-xs text-muted-foreground">
         <a
-          href="https://rybbit.io"
+          href="https://scorix.ro"
           target="_blank"
           rel="noopener"
-          title="Rybbit - Open Source Privacy-Focused Web Analytics"
+          title="scørix - Open Source Privacy-Focused Web Analytics"
         >
-          Open source web analytics powered by Rybbit
+          Open source web analytics powered by scørix
         </a>
       </div>
     </div>

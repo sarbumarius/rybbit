@@ -74,11 +74,11 @@ export function MainSection() {
           <div className="flex items-center justify-between px-2 md:px-0">
             <div className="flex items-center space-x-4">
               <Link
-                href={session.data ? "/" : "https://rybbit.io"}
+                href={session.data ? "/" : "https://scorix.ro"}
                 className={cn("text-lg font-semibold flex items-center gap-1.5 opacity-75", tilt_wrap.className)}
               >
-                <Image src="/rybbit.svg" alt="Rybbit" width={20} height={20} />
-                rybbit.io
+                <Image src="/scorix.png" alt="scørix" width={20} height={20} />
+                  scørix
               </Link>
             </div>
             <span className="text-sm text-neutral-200">{SELECTED_STAT_MAP[selectedStat]}</span>

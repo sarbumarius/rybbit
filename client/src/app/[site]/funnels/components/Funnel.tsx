@@ -4,6 +4,15 @@ import { DateSelector } from "@/components/DateSelector/DateSelector";
 import { Time } from "@/components/DateSelector/types";
 import { round } from "lodash";
 import { FunnelResponse } from "../../../../api/analytics/funnels/useGetFunnel";
+import { Badge } from "@/components/ui/badge";
+import Link from "next/link";
+import { useParams } from "next/navigation";
+import { useState, useMemo } from "react";
+import { User as UserIcon, Video, MoreVertical, List } from "lucide-react";
+import { UserActionsSheet } from "@/components/UserActions/UserActionsSheet";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
 
 export type FunnelChartData = {
   stepName: string;
@@ -23,6 +32,11 @@ interface FunnelProps {
 }
 
 export function Funnel({ data, isError, error, isPending, time, setTime }: FunnelProps) {
+  const { site } = useParams() as { site: string };
+  const [openSteps, setOpenSteps] = useState<Record<number, boolean>>({});
+  const [actionsOpen, setActionsOpen] = useState<boolean>(false);
+  const [actionsUserId, setActionsUserId] = useState<string | null>(null);
+  const [selectedEntryKey, setSelectedEntryKey] = useState<string | null>(null);
   // Prepare chart data
   const chartData =
     data?.map(step => ({
@@ -32,6 +46,64 @@ export function Funnel({ data, isError, error, isPending, time, setTime }: Funne
       dropoffRate: step.dropoff_rate,
       stepNumber: step.step_number,
     })) || [];
+
+  // Build per-step user sets and progressive intersections (continuous flow up to each step)
+  const userSetsPerStep = useMemo(() => {
+    if (!data) return [] as Array<Set<string>>;
+    return data.map(step => {
+      const entries = step.details?.entries || [];
+      const ids = entries.map(e => e.user_id).filter((u): u is string => Boolean(u));
+      return new Set(ids);
+    });
+  }, [data]);
+
+  // Users that appear in all steps (global intersection)
+  const globalIntersection = useMemo(() => {
+    if (!userSetsPerStep.length) return new Set<string>();
+    let inter = new Set<string>(userSetsPerStep[0]);
+    for (let i = 1; i < userSetsPerStep.length; i++) {
+      const next = userSetsPerStep[i];
+      const tmp = new Set<string>();
+      inter.forEach(u => {
+        if (next.has(u)) tmp.add(u);
+      });
+      inter = tmp;
+    }
+    return inter;
+  }, [userSetsPerStep]);
+
+  // Users present in all steps up to each step (prefix intersection)
+  const prefixIntersections = useMemo(() => {
+    const result: Array<Set<string>> = [];
+    if (!userSetsPerStep.length) return result;
+    let inter = new Set<string>(userSetsPerStep[0]);
+    result[0] = new Set(inter);
+    for (let i = 1; i < userSetsPerStep.length; i++) {
+      const next = userSetsPerStep[i];
+      const tmp = new Set<string>();
+      inter.forEach(u => {
+        if (next.has(u)) tmp.add(u);
+      });
+      inter = tmp;
+      result[i] = new Set(inter);
+    }
+    return result;
+  }, [userSetsPerStep]);
+
+  // Map user_id to the set of step indices where they appear
+  const userStepsMap = useMemo(() => {
+    const map = new Map<string, Set<number>>();
+    if (!data) return map;
+    data.forEach((step, idx) => {
+      const entries = step.details?.entries || [];
+      entries.forEach(e => {
+        if (!e.user_id) return;
+        if (!map.has(e.user_id)) map.set(e.user_id, new Set<number>());
+        map.get(e.user_id)!.add(idx);
+      });
+    });
+    return map;
+  }, [data]);
 
   // Get first and last data points for total conversion metrics
   const firstStep = chartData[0];
@@ -154,6 +226,311 @@ export function Funnel({ data, isError, error, isPending, time, setTime }: Funne
                     </div>
                   </div>
                 )}
+
+                {/* Identified pages/actions for this step */}
+                {/*{data && (data[index]?.details?.items?.length || 0) > 0 && (*/}
+                {/*  <div className="pl-8 mt-2">*/}
+                {/*    <div className="text-[11px] text-neutral-400 mb-1">Identified for this step</div>*/}
+                {/*    <div className="flex flex-wrap gap-2">*/}
+                {/*      {data[index]!.details!.items.map(it => (*/}
+                {/*        <Badge key={it.label} variant="outline" className="px-1.5 py-0 h-6 bg-neutral-850 border-neutral-800 text-neutral-200">*/}
+                {/*          <span className="font-mono text-[11px]">{it.label}</span>*/}
+                {/*          <span className="ml-2 text-[10px] text-neutral-400">{it.users.toLocaleString()} users</span>*/}
+                {/*        </Badge>*/}
+                {/*      ))}*/}
+                {/*    </div>*/}
+                {/*  </div>*/}
+                {/*)}*/}
+                {/* Entries for this step */}
+                {data && (data[index]?.details?.entries?.length || 0) > 0 && (
+                  <div className="pl-8 mt-2">
+                    <div className="flex items-center justify-between border ps-3 rounded-full border-neutral-800">
+                      <div className="text-[11px] text-neutral-400">Entries pages / actions</div>
+                      <button
+                        type="button"
+                        onClick={() => setOpenSteps(s => ({ ...s, [index]: !s[index] }))}
+                        className="text-[11px] px-2 py-1 rounded-full border border-neutral-800 bg-neutral-850 hover:bg-neutral-800 text-neutral-200"
+                      >
+                        {openSteps[index] ? "Hide entries" : `View entries (${data[index]!.details!.entries!.length})`}
+                      </button>
+                    </div>
+                    {openSteps[index] && (() => {
+                      const entriesSorted = data[index]!.details!.entries!
+                        .slice()
+                        .sort((a, b) => {
+                          const aGreen = !!(a.user_id && globalIntersection.has(a.user_id));
+                          const bGreen = !!(b.user_id && globalIntersection.has(b.user_id));
+                          const aOnlyFirst = !!(a.user_id && userStepsMap.get(a.user_id)?.size === 1 && userStepsMap.get(a.user_id)!.has(0));
+                          const bOnlyFirst = !!(b.user_id && userStepsMap.get(b.user_id)?.size === 1 && userStepsMap.get(b.user_id)!.has(0));
+                          const aYellow = !!(a.user_id && prefixIntersections[index]?.has(a.user_id) && !globalIntersection.has(a.user_id) && !(index === 0 && aOnlyFirst));
+                          const bYellow = !!(b.user_id && prefixIntersections[index]?.has(b.user_id) && !globalIntersection.has(b.user_id) && !(index === 0 && bOnlyFirst));
+                          if (aGreen !== bGreen) return aGreen ? -1 : 1;
+                          if (aYellow !== bYellow) return aYellow ? -1 : 1;
+                          return 0;
+                        });
+
+                      return (
+                        <>
+                          {/* Desktop/tablet table */}
+                          <div className="mt-2 overflow-x-auto hidden md:block">
+                            <table className="w-full text-[11px]">
+                              <thead className="text-neutral-400">
+                                <tr className="border-b border-neutral-800">
+                                  <th className="text-left py-1 pr-2">Type</th>
+                                  <th className="text-left py-1 pr-2">Label</th>
+                                  <th className="text-left py-1 pr-2">Session</th>
+                                  <th className="text-left py-1 pr-2">User</th>
+                                  <th className="text-left py-1 pr-2">Actions</th>
+                                </tr>
+                              </thead>
+                              <tbody className="text-neutral-300">
+                                {entriesSorted.map((en, i) => {
+                                  const isGreen = !!(en.user_id && globalIntersection.has(en.user_id));
+                                  const stepsForUser = en.user_id ? userStepsMap.get(en.user_id) : undefined;
+                                  const onlyInFirst = !!(stepsForUser && stepsForUser.size === 1 && stepsForUser.has(0));
+                                  const isYellow = !!(en.user_id && prefixIntersections[index]?.has(en.user_id) && !globalIntersection.has(en.user_id) && !(index === 0 && onlyInFirst));
+                                  const entryKey = `${en.user_id || 'anon'}|${en.session_id || 'nosess'}|${en.label}|${en.type}`;
+                                  const isSelected = selectedEntryKey === entryKey;
+                                  return (
+                                    <tr key={`${en.session_id ?? i}-${i}`} className={`${isSelected ? "bg-emerald-900/30 border-b border-emerald-500" : "border-b border-neutral-800"} ${isGreen ? "bg-emerald-900/20" : isYellow ? "bg-amber-900/20" : ""}`}>
+                                      <td className="py-1 pr-2">
+                                        <Badge variant="outline" className="px-1.5 py-0 h-5 bg-neutral-850 border-neutral-700 text-neutral-200 uppercase">
+                                          {en.type}
+                                        </Badge>
+                                      </td>
+                                      <td className="py-1 pr-2 font-mono">{en.label}</td>
+                                      <td className="py-1 pr-2">
+                                        {en.session_id ? (
+                                          <span className="font-mono break-all">{en.session_id}</span>
+                                        ) : (
+                                          <span className="text-neutral-500">no session</span>
+                                        )}
+                                      </td>
+                                      <td className="py-1 pr-2">
+                                        {en.user_id ? (
+                                          <div className="flex items-center gap-1">
+                                            <UserIcon className="w-3.5 h-3.5 text-neutral-400" />
+                                            <span className={`font-mono break-all ${isGreen ? "text-emerald-400" : isYellow ? "text-amber-400" : ""}`}>{en.user_id}</span>
+                                          </div>
+                                        ) : (
+                                          <span className="text-neutral-500">anonymous</span>
+                                        )}
+                                      </td>
+                                      <td className="py-1 pr-2">
+                                        {/* Desktop actions: icon buttons with tooltips */}
+                                        <div className="hidden md:flex items-center gap-1.5">
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <span>
+                                                {en.user_id ? (
+                                                  <Link
+                                                    href={`/${site}/replay?user=${en.user_id}`}
+                                                    target="_blank"
+                                                    className="p-1 rounded border border-neutral-800 bg-neutral-850 hover:bg-neutral-800 text-neutral-200 inline-flex"
+                                                    title="View video"
+                                                  >
+                                                    <Video className="w-3.5 h-3.5 text-blue-400" />
+                                                  </Link>
+                                                ) : (
+                                                  <span className="p-1 rounded border border-neutral-900 text-neutral-600 cursor-not-allowed inline-flex">
+                                                    <Video className="w-3.5 h-3.5" />
+                                                  </span>
+                                                )}
+                                              </span>
+                                            </TooltipTrigger>
+                                            <TooltipContent>View video</TooltipContent>
+                                          </Tooltip>
+
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <span>
+                                                {en.user_id ? (
+                                                  <Link
+                                                    href={`/${site}/user/${en.user_id}`}
+                                                    target="_blank"
+                                                    className="p-1 rounded border border-neutral-800 bg-neutral-850 hover:bg-neutral-800 text-neutral-200 inline-flex"
+                                                    title="Go to user"
+                                                  >
+                                                    <UserIcon className="w-3.5 h-3.5 text-neutral-300" />
+                                                  </Link>
+                                                ) : (
+                                                  <span className="p-1 rounded border border-neutral-900 text-neutral-600 cursor-not-allowed inline-flex">
+                                                    <UserIcon className="w-3.5 h-3.5" />
+                                                  </span>
+                                                )}
+                                              </span>
+                                            </TooltipTrigger>
+                                            <TooltipContent>Go to user</TooltipContent>
+                                          </Tooltip>
+
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <button
+                                                type="button"
+                                                onClick={() => {
+                                                  if (!en.user_id) return;
+                                                  setActionsUserId(en.user_id!);
+                                                  setSelectedEntryKey(entryKey);
+                                                  setActionsOpen(true);
+                                                }}
+                                                className="p-1 rounded border border-neutral-800 bg-neutral-850 hover:bg-neutral-800 text-neutral-200 inline-flex"
+                                                title="View actions"
+                                              >
+                                                <List className="w-3.5 h-3.5 text-amber-400" />
+                                              </button>
+                                            </TooltipTrigger>
+                                            <TooltipContent>View actions</TooltipContent>
+                                          </Tooltip>
+                                        </div>
+
+                                        {/* Mobile actions: dropdown */}
+                                        <div className="md:hidden">
+                                          <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                              <Button variant="outline" size="sm" className="h-6 px-2">
+                                                <MoreVertical className="w-4 h-4" />
+                                              </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end" className="min-w-[180px]">
+                                              {en.user_id ? (
+                                                <Link href={`/${site}/replay?user=${en.user_id}`} target="_blank">
+                                                  <DropdownMenuItem className="flex items-center gap-2">
+                                                    <Video className="w-4 h-4 text-blue-400" />
+                                                    <span>View video</span>
+                                                  </DropdownMenuItem>
+                                                </Link>
+                                              ) : (
+                                                <DropdownMenuItem disabled className="flex items-center gap-2">
+                                                  <Video className="w-4 h-4" />
+                                                  <span>View video</span>
+                                                </DropdownMenuItem>
+                                              )}
+
+                                              {en.user_id ? (
+                                                <Link href={`/${site}/user/${en.user_id}`} target="_blank">
+                                                  <DropdownMenuItem className="flex items-center gap-2">
+                                                    <UserIcon className="w-4 h-4" />
+                                                    <span>Go to user</span>
+                                                  </DropdownMenuItem>
+                                                </Link>
+                                              ) : (
+                                                <DropdownMenuItem disabled className="flex items-center gap-2">
+                                                  <UserIcon className="w-4 h-4" />
+                                                  <span>Go to user</span>
+                                                </DropdownMenuItem>
+                                              )}
+
+                                              <DropdownMenuItem
+                                                className="flex items-center gap-2"
+                                                onClick={() => {
+                                                  if (!en.user_id) return;
+                                                  setActionsUserId(en.user_id!);
+                                                  setSelectedEntryKey(entryKey);
+                                                  setActionsOpen(true);
+                                                }}
+                                              >
+                                                <List className="w-4 h-4 text-amber-400" />
+                                                <span>View actions</span>
+                                              </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                          </DropdownMenu>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+
+                          {/* Mobile stacked cards */}
+                          <div className="md:hidden mt-2 space-y-2">
+                            {entriesSorted.map((en, i) => {
+                              const isGreen = !!(en.user_id && globalIntersection.has(en.user_id));
+                              const stepsForUser = en.user_id ? userStepsMap.get(en.user_id) : undefined;
+                              const onlyInFirst = !!(stepsForUser && stepsForUser.size === 1 && stepsForUser.has(0));
+                              const isYellow = !!(en.user_id && prefixIntersections[index]?.has(en.user_id) && !globalIntersection.has(en.user_id) && !(index === 0 && onlyInFirst));
+                              const entryKey = `${en.user_id || 'anon'}|${en.session_id || 'nosess'}|${en.label}|${en.type}`;
+                              const isSelected = selectedEntryKey === entryKey;
+                              return (
+                                <div key={`${en.session_id ?? i}-card-${i}`} className={`rounded-md border ${isSelected ? 'border-emerald-500 bg-emerald-900/20' : 'border-neutral-800 bg-neutral-900' } p-2`}>
+                                  <div className="flex items-center justify-between">
+                                    <Badge variant="outline" className="px-1.5 py-0 h-5 bg-neutral-850 border-neutral-700 text-neutral-200 uppercase">{en.type}</Badge>
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger asChild>
+                                        <Button variant="outline" size="sm" className="h-6 px-2">
+                                          <MoreVertical className="w-4 h-4" />
+                                        </Button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="end" className="min-w-[180px]">
+                                        {en.user_id ? (
+                                          <Link href={`/${site}/replay?user=${en.user_id}`} target="_blank">
+                                            <DropdownMenuItem className="flex items-center gap-2">
+                                              <Video className="w-4 h-4 text-blue-400" />
+                                              <span>View video</span>
+                                            </DropdownMenuItem>
+                                          </Link>
+                                        ) : (
+                                          <DropdownMenuItem disabled className="flex items-center gap-2">
+                                            <Video className="w-4 h-4" />
+                                            <span>View video</span>
+                                          </DropdownMenuItem>
+                                        )}
+                                        {en.user_id ? (
+                                          <Link href={`/${site}/user/${en.user_id}`} target="_blank">
+                                            <DropdownMenuItem className="flex items-center gap-2">
+                                              <UserIcon className="w-4 h-4" />
+                                              <span>Go to user</span>
+                                            </DropdownMenuItem>
+                                          </Link>
+                                        ) : (
+                                          <DropdownMenuItem disabled className="flex items-center gap-2">
+                                            <UserIcon className="w-4 h-4" />
+                                            <span>Go to user</span>
+                                          </DropdownMenuItem>
+                                        )}
+                                        <DropdownMenuItem
+                                          className="flex items-center gap-2"
+                                          onClick={() => {
+                                            if (!en.user_id) return;
+                                            setActionsUserId(en.user_id!);
+                                            setSelectedEntryKey(entryKey);
+                                            setActionsOpen(true);
+                                          }}
+                                        >
+                                          <List className="w-4 h-4 text-amber-400" />
+                                          <span>View actions</span>
+                                        </DropdownMenuItem>
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                  </div>
+                                  <div className="mt-2 text-[11px] space-y-1">
+                                    <div className="font-mono break-all text-neutral-200">{en.label}</div>
+                                    <div className="text-neutral-400">
+                                      <span className="text-neutral-500">Session: </span>
+                                      {en.session_id ? <span className="font-mono break-all">{en.session_id}</span> : <span className="text-neutral-500">no session</span>}
+                                    </div>
+                                    <div className="text-neutral-400 flex items-center gap-1">
+                                      <span className="text-neutral-500">User: </span>
+                                      {en.user_id ? (
+                                        <>
+                                          <UserIcon className="w-3.5 h-3.5 text-neutral-400" />
+                                          <span className={`font-mono break-all ${isGreen ? 'text-emerald-400' : isYellow ? 'text-amber-400' : ''}`}>{en.user_id}</span>
+                                        </>
+                                      ) : (
+                                        <span className="text-neutral-500">anonymous</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+                )}
               </div>
             );
           })}
@@ -165,6 +542,17 @@ export function Funnel({ data, isError, error, isPending, time, setTime }: Funne
           </div>
         </div>
       )}
+      <UserActionsSheet
+        userId={actionsUserId}
+        open={actionsOpen}
+        onOpenChange={(open) => {
+          setActionsOpen(open);
+          if (!open) {
+            setActionsUserId(null);
+            setSelectedEntryKey(null);
+          }
+        }}
+      />
     </div>
   );
 }

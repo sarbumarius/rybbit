@@ -9,7 +9,7 @@ import { SubHeader } from "../components/SubHeader/SubHeader";
 import { DisabledOverlay } from "../../../components/DisabledOverlay";
 
 export default function MapPage() {
-  useSetPageTitle("Rybbit · Map");
+  useSetPageTitle("scørix · Map");
 
   const [mapMode, setMapMode] = useState<"total" | "perCapita">("total");
   const [mapView, setMapView] = useState<"countries" | "subdivisions">("countries");

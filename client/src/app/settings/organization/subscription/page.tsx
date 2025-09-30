@@ -13,7 +13,7 @@ import { Building } from "lucide-react";
 import { authClient } from "@/lib/auth";
 
 export default function OrganizationSubscriptionPage() {
-  useSetPageTitle("Rybbit · Organization Subscription");
+  useSetPageTitle("scørix · Organization Subscription");
   const { data: activeSubscription, isLoading: isLoadingSubscription } = useStripeSubscription();
 
   const { data: activeOrg, isPending } = authClient.useActiveOrganization();

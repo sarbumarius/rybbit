@@ -99,3 +99,33 @@ There are two ways to start using Rybbit:
 ## ⭐ Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=rybbit-io/rybbit&type=Date)](https://www.star-history.com/#rybbit-io/rybbit&Date)
+
+
+## 🛠️ Local Dev vs Production with Docker Compose
+
+This repo includes two ready-to-use modes for the web client:
+
+- Development: live reload (Next.js dev server), edits update in real time
+- Production: optimized Next.js build served by the production runtime
+
+You can switch between them with a single command.
+
+Prerequisites:
+- Docker and Docker Compose v2
+- A populated .env file in the project root (run ./setup.sh if needed)
+
+Commands:
+- Development (uses docker-compose.yml + docker-compose.override.yml):
+  ./up-dev.sh
+
+- Production (uses only docker-compose.yml):
+  ./up-prod.sh
+
+Notes:
+- In dev, the client runs npm run dev in a container with your local client/ code mounted.
+  Port mapping: host 3003 -> container 3002 (open http://localhost:3003).
+- In prod, the client is built with client/Dockerfile and served on port 3002 by default.
+  If you have Caddy enabled and proper DOMAIN_NAME, it will proxy 80/443 to the client/backend.
+- You can still run these manually without the helper scripts:
+  - Dev: docker compose up -d --build
+  - Prod: docker compose -f docker-compose.yml up -d --build

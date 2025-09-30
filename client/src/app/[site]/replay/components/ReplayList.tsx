@@ -12,10 +12,35 @@ import { ScrollArea } from "../../../../components/ui/scroll-area";
 import { Input } from "../../../../components/ui/input";
 
 export function ReplayList() {
-  const { sessionId, setSessionId, minDuration, setMinDuration } = useReplayStore();
+  const { sessionId, setSessionId, minDuration, setMinDuration, selectedUserId, setSelectedUserId } = useReplayStore();
+
+  // URL sync for user filter
+  // We use next/navigation hooks to read and write the `user` search param
+  const searchParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : undefined;
+
+  useEffect(() => {
+    // Initialize from URL param on mount
+    const urlUser = searchParams?.get("user") || undefined;
+    if (urlUser && urlUser !== selectedUserId) {
+      setSelectedUserId(urlUser);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const updateUrlUserParam = (user?: string) => {
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    if (user && user.trim()) {
+      url.searchParams.set("user", user.trim());
+    } else {
+      url.searchParams.delete("user");
+    }
+    window.history.replaceState({}, "", url.toString());
+  };
 
   const { data, isLoading, error, fetchNextPage, hasNextPage, isFetchingNextPage } = useGetSessionReplays({
     minDuration,
+    userId: selectedUserId,
   });
 
   // Use the intersection observer hook for infinite scroll
@@ -50,17 +75,44 @@ export function ReplayList() {
   return (
     <div className="flex flex-col gap-2">
       <div className="rounded-lg border border-neutral-800 bg-neutral-900 flex flex-col">
-        <div className="flex items-center gap-2 p-2">
-          <div className="text-xs text-neutral-400">Min Duration</div>
-          <div className="flex items-center gap-1">
+        <div className="grid grid-cols-1 gap-2 p-2 justify-between">
+          <div className="flex items-center gap-2">
+            <div className="text-xs text-neutral-400">Min Duration</div>
+            <div className="flex items-center gap-1">
+              <Input
+                type="number"
+                value={minDuration}
+                inputSize="sm"
+                onChange={e => setMinDuration(Number(e.target.value))}
+                className="w-16"
+              />
+              <div className="text-xs text-neutral-400">s</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 relative">
+            <div className="text-xs text-neutral-400">User</div>
             <Input
-              type="number"
-              value={minDuration}
+              placeholder="Filter by user_id"
+              value={selectedUserId || ""}
               inputSize="sm"
-              onChange={e => setMinDuration(Number(e.target.value))}
-              className="w-16"
+              onChange={e => {
+                const v = e.target.value;
+                setSelectedUserId(v || undefined);
+                updateUrlUserParam(v || undefined);
+              }}
+              className="w-[200px]"
             />
-            <div className="text-xs text-neutral-400">s</div>
+            {selectedUserId ? (
+              <button
+                className="text-xs text-neutral-300 hover:text-white absolute right-0"
+                onClick={() => {
+                  setSelectedUserId(undefined);
+                  updateUrlUserParam(undefined);
+                }}
+              >
+                x
+              </button>
+            ) : null}
           </div>
         </div>
       </div>
