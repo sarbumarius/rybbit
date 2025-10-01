@@ -63,7 +63,9 @@ export function SubHeader({ availableFilters }: { availableFilters?: FilterParam
   };
 
   return (
-    <div className="fixed bottom-0 bg-neutral-900 left-2/4 px-5 pt-2  border-1 border-neutral-600 border border-t-1 border-b-0 rounded-t-2xl">
+    <div className="z-20 fixed bottom-0 max-w-[1400px]  bg-neutral-900   border-1 border-neutral-600 border border-t-1 border-b-0 rounded-t-2xl w-full  mx-auto pt-3 pb-0 px-3"
+
+>
       <div className="flex gap-2 mb-3 justify-between">
         <div className="flex items-center gap-2">
           <MobileSidebar />
@@ -95,7 +97,7 @@ export function SubHeader({ availableFilters }: { availableFilters?: FilterParam
             </Button>
 
             {/* Custom visibility toggles */}
-            <div className="filtreCustom flex items-center gap-1 ml-2">
+            <div className="filtreCustom  items-center gap-1 ml-2 hidden md:flex">
               <div className="flex items-center gap-2" title="Toggle product visuals (badges and visited products)">
                 <span className="text-xs text-neutral-300">Products</span>
                 <Switch

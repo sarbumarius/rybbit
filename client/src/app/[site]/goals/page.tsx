@@ -18,7 +18,7 @@ export default function GoalsPage() {
   const { site } = useStore();
   const [pagination, setPagination] = useState({
     pageIndex: 0, // TablePagination uses 0-based indexing
-    pageSize: 10, // Show 10 goals per page
+    pageSize: 1000000, // Show all goals on a single page
   });
 
   const { data: goalsData, isLoading } = useGetGoals({
@@ -107,7 +107,7 @@ export default function GoalsPage() {
 
   return (
     <DisabledOverlay message="Goals" featurePath="goals">
-      <div className="p-2 md:p-4 max-w-[1400px] mx-auto space-y-3">
+      <div className="p-2 md:p-4 max-w-[1400px] mx-auto space-y-3 ">
         <SubHeader availableFilters={GOALS_PAGE_FILTERS} />
         <div className="flex items-center justify-between">
           <div />
@@ -130,7 +130,7 @@ export default function GoalsPage() {
             action={<CreateGoalButton siteId={Number(site)} />}
           />
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-6 pb-20">
             <GoalsList goals={goalsData.data} siteId={Number(site)} />
 
             {goalsData.meta.totalPages > 1 && (

@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import { SavedFunnel, useGetFunnels } from "../../../api/analytics/funnels/useGetFunnels";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useStore } from "@/lib/store";
@@ -66,6 +67,71 @@ export default function FunnelsPage() {
   const { site } = useStore();
   const { data: funnels, isLoading, error } = useGetFunnels(site);
 
+  const [orderMap, setOrderMap] = React.useState<Record<number, number>>({});
+
+  // Load order map from localStorage per site
+  React.useEffect(() => {
+    if (!site) return;
+    try {
+      const raw = localStorage.getItem(`funnelOrder:${site}`);
+      if (raw) {
+        const parsed = JSON.parse(raw) as Record<string, number>;
+        // keys may be strings; convert to number keys in state
+        const nm: Record<number, number> = {};
+        Object.entries(parsed).forEach(([k, v]) => {
+          const id = Number(k);
+          if (!isNaN(id) && typeof v === 'number') nm[id] = v;
+        });
+        setOrderMap(nm);
+      } else {
+        setOrderMap({});
+      }
+    } catch {
+      setOrderMap({});
+    }
+  }, [site]);
+
+  const persistOrderMap = (map: Record<number, number>) => {
+    try {
+      const strMap: Record<string, number> = {};
+      Object.entries(map).forEach(([k, v]) => {
+        strMap[String(k)] = v as number;
+      });
+      localStorage.setItem(`funnelOrder:${site}`, JSON.stringify(strMap));
+    } catch {}
+  };
+
+  const handleOrderChange = (funnelId: number, val?: number) => {
+    setOrderMap(prev => {
+      const next = { ...prev };
+      if (val === undefined) {
+        delete next[funnelId];
+      } else {
+        next[funnelId] = val;
+      }
+      persistOrderMap(next);
+      return next;
+    });
+  };
+
+  const sortedFunnels = React.useMemo(() => {
+    if (!funnels) return [] as SavedFunnel[];
+    const withIndex = funnels.map((f, idx) => ({ f, idx }));
+    withIndex.sort((a, b) => {
+      const ao = orderMap[a.f.id];
+      const bo = orderMap[b.f.id];
+      const aHas = typeof ao === 'number';
+      const bHas = typeof bo === 'number';
+      if (aHas && bHas) {
+        if (ao !== bo) return ao - bo;
+        return a.idx - b.idx;
+      }
+      if (aHas !== bHas) return aHas ? -1 : 1;
+      return a.idx - b.idx;
+    });
+    return withIndex.map(x => x.f);
+  }, [funnels, orderMap]);
+
   if (isLoading) {
     return (
       <div className="p-4 max-w-[1300px] mx-auto space-y-4">
@@ -98,8 +164,13 @@ export default function FunnelsPage() {
           </div>
         ) : funnels?.length ? (
           <div className="space-y-4">
-            {funnels.map((funnel: SavedFunnel) => (
-              <FunnelRow key={funnel.id} funnel={funnel} />
+            {sortedFunnels.map((funnel: SavedFunnel) => (
+              <FunnelRow
+                key={funnel.id}
+                funnel={funnel}
+                orderValue={orderMap[funnel.id]}
+                onOrderChange={(val?: number) => handleOrderChange(funnel.id, val)}
+              />
             ))}
           </div>
         ) : (

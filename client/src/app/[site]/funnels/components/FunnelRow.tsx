@@ -8,6 +8,7 @@ import { DateRangeMode, Time } from "@/components/DateSelector/types";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Switch } from "@/components/ui/switch";
 import {
   ArrowRight,
   ChevronDown,
@@ -17,9 +18,12 @@ import {
   FilterIcon,
   MousePointerClick,
   Trash2,
+  Copy,
+  RefreshCw,
+  Eye,
 } from "lucide-react";
 import { DateTime } from "luxon";
-import { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { getStartAndEndDate } from "../../../../api/utils";
 import { ThreeDotLoader } from "../../../../components/Loaders";
@@ -31,25 +35,29 @@ import {
   getParameterValueLabel,
 } from "../../components/shared/Filters/utils";
 import { EditFunnelDialog } from "./EditFunnel";
+import { DuplicateFunnelDialog } from "./DuplicateFunnel";
+import { ViewFunnelDialog } from "./ViewFunnel";
 import { Funnel } from "./Funnel";
 
 interface FunnelRowProps {
   funnel: SavedFunnel;
+  orderValue?: number;
+  onOrderChange?: (val?: number) => void;
 }
 
-export function FunnelRow({ funnel }: FunnelRowProps) {
+export function FunnelRow({ funnel, orderValue, onOrderChange }: FunnelRowProps) {
   const [expanded, setExpanded] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isDuplicateModalOpen, setIsDuplicateModalOpen] = useState(false);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const { getRegionName } = useGetRegionName();
 
   // Time state for funnel visualization - default to last 7 days
   const [time, setTime] = useState<Time>({
-    mode: "range",
-    startDate: DateTime.now().minus({ days: 7 }).toISODate(),
-    endDate: DateTime.now().toISODate(),
-    wellKnown: "Last 7 days",
-  } as DateRangeMode);
+    mode: "day",
+    day: DateTime.now().toISODate(),
+  });
 
   const { startDate, endDate } = getStartAndEndDate(time);
 
@@ -60,6 +68,8 @@ export function FunnelRow({ funnel }: FunnelRowProps) {
     error,
     isLoading: isPending,
     isSuccess,
+    isFetching,
+    refetch,
   } = useGetFunnel(
     expanded
       ? {
@@ -78,6 +88,19 @@ export function FunnelRow({ funnel }: FunnelRowProps) {
   const handleExpand = () => {
     setExpanded(!expanded);
   };
+
+  // Auto-refresh state and last updated
+  const [autoRefresh, setAutoRefresh] = useState<boolean>(true);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
+
+  // Setup 5s auto refresh while expanded
+  useEffect(() => {
+    if (!expanded || !autoRefresh) return;
+    const id = setInterval(() => {
+      refetch().then(() => setLastUpdatedAt(Date.now())).catch(() => {});
+    }, 5000);
+    return () => clearInterval(id);
+  }, [expanded, autoRefresh, refetch]);
 
   // Handle funnel deletion
   const handleDeleteFunnel = async () => {
@@ -192,6 +215,56 @@ export function FunnelRow({ funnel }: FunnelRowProps) {
               <Edit className="h-4 w-4" />
             </Button>
 
+            {/* Order input next to Edit */}
+            {onOrderChange !== undefined && (
+              <div className="ml-1 flex items-center gap-1">
+                <label className="sr-only">Ordine</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={orderValue ?? ""}
+                  placeholder="-"
+                  onClick={e => e.stopPropagation()}
+                  onChange={e => {
+                    const val = e.target.value;
+                    if (!val) onOrderChange(undefined);
+                    else {
+                      const n = parseInt(val, 10);
+                      if (isNaN(n) || n < 1) onOrderChange(undefined);
+                      else onOrderChange(n);
+                    }
+                  }}
+                  className="w-16 h-8 px-2 py-1 rounded border border-neutral-800 bg-neutral-900 text-neutral-200 text-[12px] focus:outline-none focus:ring-1 focus:ring-accent-500"
+                  title="Ordine"
+                />
+              </div>
+            )}
+
+            {/* View button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={e => {
+                e.stopPropagation();
+                setIsViewModalOpen(true);
+              }}
+              title="View"
+            >
+              <Eye className="h-4 w-4" />
+            </Button>
+
+            {/* Duplicate button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={e => {
+                e.stopPropagation();
+                setIsDuplicateModalOpen(true);
+              }}
+            >
+              <Copy className="h-4 w-4" />
+            </Button>
+
             {/* Delete button */}
             <Button
               variant="ghost"
@@ -215,6 +288,36 @@ export function FunnelRow({ funnel }: FunnelRowProps) {
       {expanded && (
         <div className="border-t border-neutral-200 dark:border-neutral-800">
           <div className="p-4">
+            {/* Refresh controls */}
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-xs text-neutral-500">
+                {lastUpdatedAt ? `Last updated: ${new Date(lastUpdatedAt).toLocaleTimeString()}` : ""}
+              </div>
+              <div className="flex items-center gap-3" onClick={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()}>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-neutral-400">Auto 5s</span>
+                  <Switch checked={autoRefresh} onCheckedChange={setAutoRefresh} />
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8"
+                  disabled={isFetching}
+                  onClick={async e => {
+                    e.stopPropagation();
+                    try {
+                      await refetch();
+                      setLastUpdatedAt(Date.now());
+                    } catch {}
+                  }}
+                  title="Refresh now"
+                >
+                  <RefreshCw className={`w-4 h-4 mr-1 ${isFetching ? 'animate-spin' : ''}`} />
+                  Refresh
+                </Button>
+              </div>
+            </div>
+
             {isPending ? (
               <ThreeDotLoader className="h-[400px]" />
             ) : isError ? (
@@ -246,6 +349,16 @@ export function FunnelRow({ funnel }: FunnelRowProps) {
       {/* Edit Funnel Modal */}
       {isEditModalOpen && (
         <EditFunnelDialog funnel={funnel} isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} />
+      )}
+
+      {/* Duplicate Funnel Modal */}
+      {isDuplicateModalOpen && (
+        <DuplicateFunnelDialog source={funnel} isOpen={isDuplicateModalOpen} onClose={() => setIsDuplicateModalOpen(false)} />
+      )}
+
+      {/* View Funnel Modal */}
+      {isViewModalOpen && (
+        <ViewFunnelDialog funnel={funnel} isOpen={isViewModalOpen} onClose={() => setIsViewModalOpen(false)} />
       )}
     </Card>
   );

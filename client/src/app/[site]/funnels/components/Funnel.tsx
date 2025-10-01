@@ -7,7 +7,7 @@ import { FunnelResponse } from "../../../../api/analytics/funnels/useGetFunnel";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { User as UserIcon, Video, MoreVertical, List } from "lucide-react";
 import { UserActionsSheet } from "@/components/UserActions/UserActionsSheet";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -29,14 +29,29 @@ interface FunnelProps {
   isPending: boolean;
   time: Time;
   setTime: (time: Time) => void;
+  layoutMode?: "stack" | "grid"; // default stack
+  autoOpenEntries?: boolean; // default false
 }
 
-export function Funnel({ data, isError, error, isPending, time, setTime }: FunnelProps) {
+export function Funnel({ data, isError, error, isPending, time, setTime, layoutMode = "stack", autoOpenEntries = false }: FunnelProps) {
   const { site } = useParams() as { site: string };
   const [openSteps, setOpenSteps] = useState<Record<number, boolean>>({});
   const [actionsOpen, setActionsOpen] = useState<boolean>(false);
   const [actionsUserId, setActionsUserId] = useState<string | null>(null);
   const [selectedEntryKey, setSelectedEntryKey] = useState<string | null>(null);
+  // Auto-open entries for all steps when requested
+  // This runs when data changes or the flag toggles
+  useEffect(() => {
+    if (!autoOpenEntries || !data || data.length === 0) return;
+    const allOpen: Record<number, boolean> = {};
+    data.forEach((_, idx) => {
+      allOpen[idx] = true;
+    });
+    setOpenSteps(allOpen);
+  }, [autoOpenEntries, data]);
+  
+  const isGrid = layoutMode === "grid";
+  
   // Prepare chart data
   const chartData =
     data?.map(step => ({
@@ -114,28 +129,7 @@ export function Funnel({ data, isError, error, isPending, time, setTime }: Funne
 
   return (
     <div>
-      <div className="flex justify-between items-center gap-2 mb-6 ml-8">
-        <div className="flex items-center gap-4 mt-3 text-xs text-neutral-400">
-          <div className="flex items-center">
-            <div className="w-3 h-3 bg-emerald-500/70 rounded-sm mr-1"></div>
-            <span>Overall conversion</span>
-          </div>
-          <div className="flex items-center">
-            <div
-              className="w-3 h-3 rounded-sm mr-1"
-              style={{
-                background: `repeating-linear-gradient(
-                      45deg,
-                      rgba(16, 185, 129, 0.25),
-                      rgba(16, 185, 129, 0.25) 3px,
-                      rgba(16, 185, 129, 0.15) 3px,
-                      rgba(16, 185, 129, 0.15) 6px
-                    )`,
-              }}
-            ></div>
-            <span>Conversion from previous step</span>
-          </div>
-        </div>
+      <div className="flex items-center gap-4 mt-3 text-xs text-neutral-400 absolute top-0 left-1/2">
         <DateSelector time={time} setTime={setTime} pastMinutesEnabled={false} />
       </div>
 
@@ -146,7 +140,7 @@ export function Funnel({ data, isError, error, isPending, time, setTime }: Funne
           </div>
         </div>
       ) : data && chartData.length > 0 ? (
-        <div className="space-y-0">
+        <div className={`${isGrid ? "grid gap-6 md:grid-cols-2 xl:grid-cols-3" : "space-y-0"}`}>
           {chartData.map((step, index) => {
             // Calculate the percentage width for the bar
             const ratio = firstStep?.visitors ? step.visitors / firstStep.visitors : 0;
@@ -158,7 +152,7 @@ export function Funnel({ data, isError, error, isPending, time, setTime }: Funne
             const dropoffPercent = prevStep ? (droppedUsers / prevStep.visitors) * 100 : 0;
 
             return (
-              <div key={step.stepNumber} className="relative pb-6">
+              <div key={step.stepNumber} className={`${isGrid ? "relative p-4 border border-neutral-800 rounded-lg bg-neutral-900" : "relative pb-6"}`}>
                 {/* Step number indicator */}
                 <div className="flex items-center mb-2">
                   <div className="flex-shrink-0 w-6 h-6 rounded-full bg-neutral-800 flex items-center justify-center text-xs mr-2">
@@ -168,7 +162,7 @@ export function Funnel({ data, isError, error, isPending, time, setTime }: Funne
                 </div>
 
                 {/* Bar and metrics */}
-                <div className="flex items-center pl-8">
+                <div className={`flex items-center ${isGrid ? "" : "pl-8"}`}>
                   {/* Metrics */}
                   <div className="flex-shrink-0 min-w-[130px] mr-4">
                     <div className="flex items-baseline">
@@ -207,14 +201,14 @@ export function Funnel({ data, isError, error, isPending, time, setTime }: Funne
                 </div>
 
                 {/* Dropoff indicator */}
-                {index < chartData.length - 1 && (
+                {!isGrid && index < chartData.length - 1 && (
                   <div className="absolute left-[11px] -bottom-6 top-6 flex flex-col items-center">
                     <div className="h-full w-0.5 bg-neutral-800"></div>
                   </div>
                 )}
 
                 {/* Dropoff metrics */}
-                {index !== 0 && (
+                {!isGrid && index !== 0 && (
                   <div className="pl-8 flex">
                     <div className="min-w-[180px] mr-4">
                       <div className="flex items-baseline text-orange-500">
@@ -243,19 +237,34 @@ export function Funnel({ data, isError, error, isPending, time, setTime }: Funne
                 {/*)}*/}
                 {/* Entries for this step */}
                 {data && (data[index]?.details?.entries?.length || 0) > 0 && (
-                  <div className="pl-8 mt-2">
+                  <div className={`${isGrid ? "mt-3" : "pl-8 mt-2"}`}>
                     <div className="flex items-center justify-between border ps-3 rounded-full border-neutral-800">
-                      <div className="text-[11px] text-neutral-400">Entries pages / actions</div>
-                      <button
-                        type="button"
-                        onClick={() => setOpenSteps(s => ({ ...s, [index]: !s[index] }))}
-                        className="text-[11px] px-2 py-1 rounded-full border border-neutral-800 bg-neutral-850 hover:bg-neutral-800 text-neutral-200"
-                      >
-                        {openSteps[index] ? "Hide entries" : `View entries (${data[index]!.details!.entries!.length})`}
-                      </button>
+                      {(() => {
+                        const stepType = data[index]?.details?.type as "page" | "event" | undefined;
+                        const label = stepType === "page" ? "Entries pages" : stepType === "event" ? "Entries actions" : "Entries";
+                        const entriesAll = data[index]?.details?.entries || [];
+                        const normalizeType = (t: string) => (t === "pageview" ? "page" : t === "custom_event" ? "event" : t);
+                        const entriesFiltered = stepType ? entriesAll.filter(e => normalizeType(e.type) === stepType) : entriesAll;
+                        return (
+                          <>
+                            <div className="text-[11px] text-neutral-400">{label}</div>
+                            <button
+                              type="button"
+                              onClick={() => setOpenSteps(s => ({ ...s, [index]: !s[index] }))}
+                              className="text-[11px] px-2 py-1 rounded-full border border-neutral-800 bg-neutral-850 hover:bg-neutral-800 text-neutral-200"
+                            >
+                              {openSteps[index] ? "Hide entries" : `View entries (${entriesFiltered.length})`}
+                            </button>
+                          </>
+                        );
+                      })()}
                     </div>
                     {openSteps[index] && (() => {
-                      const entriesSorted = data[index]!.details!.entries!
+                      const stepType = data[index]?.details?.type as "page" | "event" | undefined;
+                      const entriesAll = data[index]?.details?.entries || [];
+                      const normalizeType = (t: string) => (t === "pageview" ? "page" : t === "custom_event" ? "event" : t);
+                      const entriesForType = stepType ? entriesAll.filter(e => normalizeType(e.type) === stepType) : entriesAll;
+                      const entriesSorted = entriesForType
                         .slice()
                         .sort((a, b) => {
                           const aGreen = !!(a.user_id && globalIntersection.has(a.user_id));
@@ -264,23 +273,32 @@ export function Funnel({ data, isError, error, isPending, time, setTime }: Funne
                           const bOnlyFirst = !!(b.user_id && userStepsMap.get(b.user_id)?.size === 1 && userStepsMap.get(b.user_id)!.has(0));
                           const aYellow = !!(a.user_id && prefixIntersections[index]?.has(a.user_id) && !globalIntersection.has(a.user_id) && !(index === 0 && aOnlyFirst));
                           const bYellow = !!(b.user_id && prefixIntersections[index]?.has(b.user_id) && !globalIntersection.has(b.user_id) && !(index === 0 && bOnlyFirst));
-                          if (aGreen !== bGreen) return aGreen ? -1 : 1;
-                          if (aYellow !== bYellow) return aYellow ? -1 : 1;
-                          return 0;
+                          if (isGrid) {
+                            // View Funnel (grid): neutral first, then yellow, then green
+                            if (aGreen !== bGreen) return aGreen ? 1 : -1; // green last
+                            if (aYellow !== bYellow) return aYellow ? 1 : -1; // yellow after neutral
+                            return 0;
+                          } else {
+                            // Default everywhere else: green first, then yellow, then neutral
+                            if (aGreen !== bGreen) return aGreen ? -1 : 1;
+                            if (aYellow !== bYellow) return aYellow ? -1 : 1;
+                            return 0;
+                          }
                         });
 
                       return (
                         <>
                           {/* Desktop/tablet table */}
-                          <div className="mt-2 overflow-x-auto hidden md:block">
+                          <div className="mt-2 overflow-x-auto hidden md:block overflow-y-auto">
                             <table className="w-full text-[11px]">
                               <thead className="text-neutral-400">
                                 <tr className="border-b border-neutral-800">
+                                  <th className="text-left py-1 pr-2">Actions</th>
+
                                   <th className="text-left py-1 pr-2">Type</th>
                                   <th className="text-left py-1 pr-2">Label</th>
-                                  <th className="text-left py-1 pr-2">Session</th>
+                                  {/*<th className="text-left py-1 pr-2">Session</th>*/}
                                   <th className="text-left py-1 pr-2">User</th>
-                                  <th className="text-left py-1 pr-2">Actions</th>
                                 </tr>
                               </thead>
                               <tbody className="text-neutral-300">
@@ -293,29 +311,6 @@ export function Funnel({ data, isError, error, isPending, time, setTime }: Funne
                                   const isSelected = selectedEntryKey === entryKey;
                                   return (
                                     <tr key={`${en.session_id ?? i}-${i}`} className={`${isSelected ? "bg-emerald-900/30 border-b border-emerald-500" : "border-b border-neutral-800"} ${isGreen ? "bg-emerald-900/20" : isYellow ? "bg-amber-900/20" : ""}`}>
-                                      <td className="py-1 pr-2">
-                                        <Badge variant="outline" className="px-1.5 py-0 h-5 bg-neutral-850 border-neutral-700 text-neutral-200 uppercase">
-                                          {en.type}
-                                        </Badge>
-                                      </td>
-                                      <td className="py-1 pr-2 font-mono">{en.label}</td>
-                                      <td className="py-1 pr-2">
-                                        {en.session_id ? (
-                                          <span className="font-mono break-all">{en.session_id}</span>
-                                        ) : (
-                                          <span className="text-neutral-500">no session</span>
-                                        )}
-                                      </td>
-                                      <td className="py-1 pr-2">
-                                        {en.user_id ? (
-                                          <div className="flex items-center gap-1">
-                                            <UserIcon className="w-3.5 h-3.5 text-neutral-400" />
-                                            <span className={`font-mono break-all ${isGreen ? "text-emerald-400" : isYellow ? "text-amber-400" : ""}`}>{en.user_id}</span>
-                                          </div>
-                                        ) : (
-                                          <span className="text-neutral-500">anonymous</span>
-                                        )}
-                                      </td>
                                       <td className="py-1 pr-2">
                                         {/* Desktop actions: icon buttons with tooltips */}
                                         <div className="hidden md:flex items-center gap-1.5">
@@ -435,6 +430,30 @@ export function Funnel({ data, isError, error, isPending, time, setTime }: Funne
                                             </DropdownMenuContent>
                                           </DropdownMenu>
                                         </div>
+                                      </td>
+
+                                      <td className="py-1 pr-2">
+                                        <Badge variant="outline" className="px-1.5 py-0 h-5 bg-neutral-850 border-neutral-700 text-neutral-200 uppercase">
+                                          {en.type === 'pageview' ? 'page' : en.type === 'custom_event' ? 'event' : en.type}
+                                        </Badge>
+                                      </td>
+                                      <td className="py-1 pr-2 font-mono">{en.label}</td>
+                                      {/*<td className="py-1 pr-2">*/}
+                                      {/*  {en.session_id ? (*/}
+                                      {/*    <span className="font-mono break-all">{en.session_id}</span>*/}
+                                      {/*  ) : (*/}
+                                      {/*    <span className="text-neutral-500">no session</span>*/}
+                                      {/*  )}*/}
+                                      {/*</td>*/}
+                                      <td className="py-1 pr-2">
+                                        {en.user_id ? (
+                                          <div className="flex items-center gap-1">
+                                            <UserIcon className="w-3.5 h-3.5 text-neutral-400" />
+                                            <span className={`userPerson font-mono break-all ${isGreen ? "text-emerald-400" : isYellow ? "text-amber-400" : ""}`}>{en.user_id}</span>
+                                          </div>
+                                        ) : (
+                                          <span className="text-neutral-500">anonymous</span>
+                                        )}
                                       </td>
                                     </tr>
                                   );

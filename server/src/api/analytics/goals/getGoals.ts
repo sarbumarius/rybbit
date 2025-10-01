@@ -18,6 +18,33 @@ interface GoalWithConversions {
   total_conversions: number;
   total_sessions: number;
   conversion_rate: number;
+  // Added: explain what and where this goal matches
+  match_scope: "pathname" | "custom_event"; // where we search
+  // For path-type goals
+  path_pattern?: string | null;
+  path_regex?: string | null;
+  matched_pages?: string[] | null;
+  // New: one entry per distinct converting session with minimal details
+  matched_conversions?: Array<{
+    session_id: string;
+    user_id: string | null;
+    pathname: string | null;
+    entry_page?: string | null;
+    exit_page?: string | null;
+    matched_at?: string | null;
+  }> | null;
+  // For event-type goals
+  event_name?: string | null;
+  event_property_key?: string | null;
+  event_property_value?: string | number | boolean | null;
+  matched_actions?: string[] | null;
+  matched_actions_details?: Array<{
+    session_id: string;
+    user_id: string | null;
+    event_name: string | null;
+    pathname?: string | null;
+    matched_at?: string | null;
+  }> | null;
 }
 
 interface GetGoalsResponse {
@@ -51,7 +78,7 @@ export async function getGoals(
     timeZone,
     filters,
     page = "1",
-    pageSize = "10",
+    pageSize = "1000000",
     sort = "createdAt",
     order = "desc",
     pastMinutesStart,
@@ -66,8 +93,8 @@ export async function getGoals(
     return reply.status(400).send({ error: "Invalid page number" });
   }
 
-  if (isNaN(pageSizeNumber) || pageSizeNumber < 1 || pageSizeNumber > 100) {
-    return reply.status(400).send({ error: "Invalid page size, must be between 1 and 100" });
+  if (isNaN(pageSizeNumber) || pageSizeNumber < 1 || pageSizeNumber > 1000000) {
+    return reply.status(400).send({ error: "Invalid page size, must be between 1 and 1000000" });
   }
 
   // Check user access to site
@@ -169,13 +196,56 @@ export async function getGoals(
         const pathPattern = goal.config.pathPattern;
         if (!pathPattern) continue;
 
-        const regex = patternToRegex(pathPattern);
+        // Support hash-based contains with both leading and trailing '#', e.g. '#gclid#' => contains in FULL URL (path + params)
+        const hashContainsMatch = pathPattern.match(/^#(.+)#$/);
+        // Support parameter search with leading '#', e.g. '#gclid' -> search in querystring contains
+        const isParamSearch = !hashContainsMatch && pathPattern.startsWith('#');
+        let effectivePattern = isParamSearch ? pathPattern.slice(1) : (hashContainsMatch ? hashContainsMatch[1] : pathPattern);
+        // Force contains semantics for hashContains and paramSearch when not already using *** marker
+        if ((hashContainsMatch || isParamSearch) && !effectivePattern.includes('***')) {
+          effectivePattern = `***${effectivePattern}***`;
+        }
+        // Build regex based on effective pattern (supports **, *, and *** contains)
+        const regex = patternToRegex(effectivePattern);
+
+        // Decide which field to match against
+        // - If '#term#': contains on FULL URL (pathname + '?' + querystring)
+        // - If starts with '#': contains on querystring only
+        // - Else if pattern uses *** contains: allow contains across full URL (pathname + '?' + querystring)
+        // - Else: classic pathname match
+        const targetExpr = hashContainsMatch
+          ? "concat(ifNull(pathname, ''), '?', ifNull(querystring, ''))"
+          : isParamSearch
+            ? "ifNull(querystring, '')"
+            : (effectivePattern.includes('***')
+                ? "concat(ifNull(pathname, ''), '?', ifNull(querystring, ''))"
+                : "pathname");
+
         conditionalClauses.push(`
           COUNT(DISTINCT IF(
-            type = 'pageview' AND match(pathname, ${SqlString.escape(regex)}),
+            type = 'pageview' AND match(${targetExpr}, ${SqlString.escape(regex)}),
             session_id,
             NULL
           )) AS goal_${goal.goalId}_conversions
+        `);
+        conditionalClauses.push(`
+          groupUniqArrayIf(pathname,
+            type = 'pageview' AND match(${targetExpr}, ${SqlString.escape(regex)})
+          ) AS goal_${goal.goalId}_matched_pages
+        `);
+        // One object per distinct converting session, JSON-encoded for transport
+        conditionalClauses.push(`
+          groupUniqArrayIf(
+            toJSONString(map(
+              'session_id', toString(session_id),
+              'user_id', nullIf(toString(user_id), ''),
+              'pathname', nullIf(pathname, ''),
+              'entry_page', (SELECT argMin(pathname, timestamp) FROM events AS ev2 WHERE ev2.session_id = events.session_id),
+              'exit_page', (SELECT argMax(pathname, timestamp) FROM events AS ev2 WHERE ev2.session_id = events.session_id),
+              'matched_at', (SELECT toString(min(timestamp)) FROM events AS ev2 WHERE ev2.session_id = events.session_id AND type = 'pageview' AND match(${targetExpr}, ${SqlString.escape(regex)}))
+            )),
+            type = 'pageview' AND match(${targetExpr}, ${SqlString.escape(regex)})
+          ) AS goal_${goal.goalId}_matched_conversions_json
         `);
       } else if (goal.goalType === "event") {
         const eventName = goal.config.eventName;
@@ -211,6 +281,23 @@ export async function getGoals(
             session_id,
             NULL
           )) AS goal_${goal.goalId}_conversions
+        `);
+        conditionalClauses.push(`
+          groupUniqArrayIf(event_name,
+            ${eventClause}
+          ) AS goal_${goal.goalId}_matched_actions
+        `);
+        conditionalClauses.push(`
+          groupUniqArrayIf(
+            toJSONString(map(
+              'session_id', toString(session_id),
+              'user_id', nullIf(toString(user_id), ''),
+              'event_name', nullIf(event_name, ''),
+              'pathname', nullIf(pathname, ''),
+              'matched_at', (SELECT toString(min(timestamp)) FROM events AS ev2 WHERE ev2.session_id = events.session_id AND ${eventClause})
+            )),
+            ${eventClause}
+          ) AS goal_${goal.goalId}_matched_actions_details_json
         `);
       }
     }
@@ -250,7 +337,7 @@ export async function getGoals(
       format: "JSONEachRow",
     });
 
-    const conversionData = await processResults<Record<string, number>>(conversionResult);
+    const conversionData = await processResults<Record<string, any>>(conversionResult);
 
     // If we didn't get any results, use zeros
     const conversions = conversionData[0] || {};
@@ -260,12 +347,96 @@ export async function getGoals(
       const totalConversions = conversions[`goal_${goal.goalId}_conversions`] || 0;
       const conversionRate = totalSessions > 0 ? totalConversions / totalSessions : 0;
 
+      // Build match metadata
+      const isPath = goal.goalType === "path";
+      const pathPattern: string | null = isPath ? (goal.config?.pathPattern ?? null) : null;
+      // Compute regex reflecting special hash patterns:
+      // - '#term#' => contains on full URL (path + params)
+      // - '#term'  => contains on querystring only
+      let pathRegex: string | null = null;
+      if (isPath && pathPattern) {
+        const fullContains = pathPattern.match(/^#(.+)#$/);
+        if (fullContains) {
+          pathRegex = patternToRegex(`***${fullContains[1]}***`);
+        } else if (pathPattern.startsWith('#')) {
+          pathRegex = patternToRegex(`***${pathPattern.slice(1)}***`);
+        } else {
+          pathRegex = patternToRegex(pathPattern);
+        }
+      }
+      const eventName: string | null = !isPath ? (goal.config?.eventName ?? null) : null;
+      const eventPropKey: string | null = !isPath ? (goal.config?.eventPropertyKey ?? null) : null;
+      const eventPropVal: string | number | boolean | null = !isPath
+        ? (goal.config?.eventPropertyValue ?? null)
+        : null;
+
+      // Matched items arrays from aggregated query
+      const matchedPages = conversions[`goal_${goal.goalId}_matched_pages`] || null;
+      const matchedConversionsJson = conversions[`goal_${goal.goalId}_matched_conversions_json`] || null;
+      const matchedActions = conversions[`goal_${goal.goalId}_matched_actions`] || null;
+      const matchedActionsDetailsJson = conversions[`goal_${goal.goalId}_matched_actions_details_json`] || null;
+
+      // Parse JSON strings to objects for matched_conversions, ensure array
+      let matchedConversions: GoalWithConversions["matched_conversions"] = null;
+      if (isPath && Array.isArray(matchedConversionsJson)) {
+        matchedConversions = matchedConversionsJson
+          .filter((s: any) => typeof s === "string" && s.length)
+          .map((s: string) => {
+            try {
+              const obj = JSON.parse(s);
+              return {
+                session_id: String(obj.session_id || ""),
+                user_id: obj.user_id ?? null,
+                pathname: obj.pathname ?? null,
+                entry_page: obj.entry_page ?? null,
+                exit_page: obj.exit_page ?? null,
+                matched_at: obj.matched_at ?? null,
+              };
+            } catch {
+              return null;
+            }
+          })
+          .filter((x: any) => x !== null) as any;
+      }
+
+      // Parse event action details
+      let matchedActionsDetails: GoalWithConversions["matched_actions"] | null = null;
+      if (!isPath && Array.isArray(matchedActionsDetailsJson)) {
+        matchedActionsDetails = matchedActionsDetailsJson
+          .filter((s: any) => typeof s === "string" && s.length)
+          .map((s: string) => {
+            try {
+              const obj = JSON.parse(s);
+              return {
+                session_id: String(obj.session_id || ""),
+                user_id: obj.user_id ?? null,
+                event_name: obj.event_name ?? null,
+                pathname: obj.pathname ?? null,
+                matched_at: obj.matched_at ?? null,
+              } as any;
+            } catch {
+              return null;
+            }
+          })
+          .filter((x: any) => x !== null) as any;
+      }
+
       return {
         ...goal,
         total_conversions: totalConversions,
         total_sessions: totalSessions,
         conversion_rate: conversionRate,
-      };
+        match_scope: isPath ? "pathname" : "custom_event",
+        path_pattern: pathPattern,
+        path_regex: pathRegex,
+        matched_pages: isPath ? (matchedPages as string[] | null) : null,
+        matched_conversions: matchedConversions,
+        event_name: eventName,
+        event_property_key: eventPropKey,
+        event_property_value: eventPropVal,
+        matched_actions: !isPath ? (matchedActions as string[] | null) : null,
+        matched_actions_details: !isPath ? (matchedActionsDetails as any) : null,
+      } as GoalWithConversions;
     });
 
     return reply.send({

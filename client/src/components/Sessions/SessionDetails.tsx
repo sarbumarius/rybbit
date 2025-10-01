@@ -42,6 +42,9 @@ import { hour12 } from "../../lib/dateTimeUtils";
 import { useGetRegionName } from "../../lib/geo";
 import { Avatar } from "../Avatar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { MoreVertical } from "lucide-react";
 
 // Known marketing identifiers and their friendly names
 const MARKETING_IDENTIFIERS: { identificator: string; name: string }[] = [
@@ -184,6 +187,8 @@ function PageviewItem({
   }>(null);
   const [productLoading, setProductLoading] = useState<boolean>(false);
   const [productError, setProductError] = useState<string | null>(null);
+  // Local state for product actions modal within PageviewItem
+  const [productAction, setProductAction] = useState<null | "messages" | "similar">(null);
 
   useEffect(() => {
     let aborted = false;
@@ -358,7 +363,7 @@ function PageviewItem({
                 <span>Loading product…</span>
               </div>
             ) : productInfo && productInfo.ok ? (
-              <div className="flex items-center gap-3 p-2 border border-neutral-800 rounded-md bg-neutral-900/50">
+              <div className="relative flex items-center gap-3 p-2 border border-neutral-800 rounded-md bg-neutral-900/50">
                 {productInfo.poza ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={productInfo.poza} alt={productInfo.nume || productInfo.slug || productSlug} className="w-12 h-12 object-cover rounded" />
@@ -379,6 +384,53 @@ function PageviewItem({
                       <span className="text-neutral-200 font-semibold">{productInfo.pret ?? productInfo.pret_redus ?? ""} {productInfo.pret || productInfo.pret_redus ? "RON" : ""}</span>
                     )}
                   </div>
+                </div> 
+                {/* Actions in top-right */}
+                <div className="absolute top-1 right-[-10px]">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm" className="h-6 px-2">
+                        <MoreVertical className="w-4 h-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="min-w-[200px]">
+                      <DropdownMenuItem
+                        onClick={() => {
+                          const detail = { slug: productInfo.slug || productSlug, product: productInfo };
+                          try { window.dispatchEvent(new CustomEvent('product:suggestMessages', { detail })); } catch {}
+                          try { console.info('Propune mesaje', detail); } catch {}
+                          setProductAction('messages');
+                        }}
+                        className="cursor-pointer"
+                      >
+                        Propune mesaje
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => {
+                          const detail = { slug: productInfo.slug || productSlug, product: productInfo };
+                          try { window.dispatchEvent(new CustomEvent('product:suggestSimilar', { detail })); } catch {}
+                          try { console.info('Propune produse similare', detail); } catch {}
+                          setProductAction('similar');
+                        }}
+                        className="cursor-pointer"
+                      >
+                        Produse similare
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+
+                  {/* Simple modal placeholder */}
+                  <Dialog open={productAction !== null} onOpenChange={(open) => { if (!open) setProductAction(null); }}>
+                    <DialogContent className="sm:max-w-[420px]">
+                      <DialogHeader>
+                        <DialogTitle>{productAction === 'messages' ? 'Propune mesaje' : productAction === 'similar' ? 'Produse similare' : ''}</DialogTitle>
+                      </DialogHeader>
+                      <div className="text-sm text-neutral-500">Momentan este doar un exemplu de modal. Apasă Anulare pentru a închide.</div>
+                      <div className="flex justify-end mt-4">
+                        <Button variant="outline" onClick={() => setProductAction(null)}>Anulare</Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
                 </div>
               </div>
             ) : productError ? (
@@ -655,6 +707,8 @@ export function SessionDetails({ session, userId, searchQuery }: SessionDetailsP
   // Visibility toggles controlled from SubHeader and persisted in localStorage (default true)
   const [showProducts, setShowProducts] = useState<boolean>(true);
   const [showCampaigns, setShowCampaigns] = useState<boolean>(true);
+  // Modal state for product actions (messages/similar)
+  const [productAction, setProductAction] = useState<null | "messages" | "similar">(null);
 
   useEffect(() => {
     try {

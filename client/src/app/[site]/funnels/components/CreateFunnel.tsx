@@ -15,12 +15,10 @@ import { Filter } from "@rybbit/shared";
 export function CreateFunnelDialog() {
   const [open, setOpen] = useState(false);
 
-  // Initial date state - last 7 days
+  // Initial date state - today
   const [time, setTime] = useState<Time>({
-    mode: "range",
-    startDate: DateTime.now().minus({ days: 7 }).toISODate(),
-    endDate: DateTime.now().toISODate(),
-    wellKnown: "Last 7 days",
+    mode: "day",
+    day: DateTime.now().toISODate(),
   });
 
   // Funnel steps state
@@ -155,7 +153,7 @@ export function CreateFunnelDialog() {
           <Plus className="w-4 h-4" /> Create Funnel
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-[95vw]">
+      <DialogContent className="max-w-[95vw] max-h-[95vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create Funnel</DialogTitle>
         </DialogHeader>

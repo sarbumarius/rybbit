@@ -57,13 +57,14 @@ type FormValues = z.infer<typeof formSchema>;
 interface GoalFormModalProps {
   siteId: number;
   goal?: Goal; // Optional goal for editing mode
+  initialGoal?: Goal; // Optional initial data for create mode (e.g., duplicate)
   trigger: React.ReactNode;
 }
 
-export default function GoalFormModal({ siteId, goal, trigger }: GoalFormModalProps) {
+export default function GoalFormModal({ siteId, goal, initialGoal, trigger }: GoalFormModalProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [useProperties, setUseProperties] = useState(
-    !!goal?.config.eventPropertyKey && !!goal?.config.eventPropertyValue
+    (!!goal?.config.eventPropertyKey && !!goal?.config.eventPropertyValue) || (!!initialGoal?.config.eventPropertyKey && !!initialGoal?.config.eventPropertyValue)
   );
 
   // Fetch suggestions for paths and events
@@ -92,18 +93,25 @@ export default function GoalFormModal({ siteId, goal, trigger }: GoalFormModalPr
       label: item.value,
     })) || [];
 
-  // Reinitialize useProperties when goal changes or modal opens
+  // Reinitialize useProperties when goal or initialGoal changes or modal opens
   useEffect(() => {
     if (isOpen) {
-      setUseProperties(!!goal?.config.eventPropertyKey && !!goal?.config.eventPropertyValue);
+      if (goal) {
+        setUseProperties(!!goal.config.eventPropertyKey && !!goal.config.eventPropertyValue);
+      } else if (initialGoal) {
+        setUseProperties(!!initialGoal.config.eventPropertyKey && !!initialGoal.config.eventPropertyValue);
+      } else {
+        setUseProperties(false);
+      }
     }
-  }, [isOpen, goal?.config.eventPropertyKey, goal?.config.eventPropertyValue]);
+  }, [isOpen, goal?.config.eventPropertyKey, goal?.config.eventPropertyValue, initialGoal?.config.eventPropertyKey, initialGoal?.config.eventPropertyValue]);
 
   const onClose = () => {
     setIsOpen(false);
   };
 
   const isEditMode = !!goal;
+    const isDuplicateMode = !isEditMode && !!initialGoal;
   const createGoal = useCreateGoal();
   const updateGoal = useUpdateGoal();
 
@@ -120,6 +128,18 @@ export default function GoalFormModal({ siteId, goal, trigger }: GoalFormModalPr
             eventPropertyKey: goal.config.eventPropertyKey || "",
             eventPropertyValue:
               goal.config.eventPropertyValue !== undefined ? String(goal.config.eventPropertyValue) : "",
+          },
+        }
+      : initialGoal
+      ? {
+          name: initialGoal.name || "",
+          goalType: initialGoal.goalType,
+          config: {
+            pathPattern: initialGoal.config.pathPattern || "",
+            eventName: initialGoal.config.eventName || "",
+            eventPropertyKey: initialGoal.config.eventPropertyKey || "",
+            eventPropertyValue:
+              initialGoal.config.eventPropertyValue !== undefined ? String(initialGoal.config.eventPropertyValue) : "",
           },
         }
       : {
@@ -193,12 +213,14 @@ export default function GoalFormModal({ siteId, goal, trigger }: GoalFormModalPr
       }}
     >
       <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{isEditMode ? "Edit Goal" : "Create Goal"}</DialogTitle>
+          <DialogTitle>{isEditMode ? "Edit Goal" : isDuplicateMode ? "Duplicate Goal" : "Create Goal"}</DialogTitle>
           <DialogDescription>
             {isEditMode
               ? "Update the goal details below."
+              : isDuplicateMode
+              ? "You are creating a copy. Adjust any fields below and save to create a new goal."
               : "Set up a new conversion goal to track specific user actions."}
           </DialogDescription>
         </DialogHeader>

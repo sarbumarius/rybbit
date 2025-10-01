@@ -16,6 +16,32 @@ export interface Goal {
   total_conversions: number;
   total_sessions: number;
   conversion_rate: number;
+  // Enriched fields from API
+  match_scope?: "pathname" | "custom_event";
+  // Path goal fields
+  path_pattern?: string | null;
+  path_regex?: string | null;
+  matched_pages?: string[] | null;
+  matched_conversions?: Array<{
+    session_id: string;
+    user_id: string | null;
+    pathname: string | null;
+    entry_page?: string | null;
+    exit_page?: string | null;
+    matched_at?: string | null;
+  }> | null;
+  // Event goal fields
+  event_name?: string | null;
+  event_property_key?: string | null;
+  event_property_value?: string | number | boolean | null;
+  matched_actions?: string[] | null;
+  matched_actions_details?: Array<{
+    session_id: string;
+    user_id: string | null;
+    event_name: string | null;
+    pathname?: string | null;
+    matched_at?: string | null;
+  }> | null;
 }
 
 export interface PaginationMeta {

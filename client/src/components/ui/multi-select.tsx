@@ -40,7 +40,11 @@ export function MultiSelect({
   const [open, setOpen] = React.useState(false);
   const [search, setSearch] = React.useState("");
 
-  const selected = React.useMemo(() => options.filter(option => value.includes(option.value)), [options, value]);
+  // Include custom values (not present in options) by mapping value[] to display labels
+  const selected = React.useMemo(() => {
+    const map = new Map(options.map(o => [o.value, o] as const));
+    return value.map(v => map.get(v) ?? { value: v, label: v });
+  }, [options, value]);
 
   const handleSelect = (option: MultiSelectOption) => {
     const newValue = value.includes(option.value) ? value.filter(v => v !== option.value) : [...value, option.value];
@@ -56,6 +60,23 @@ export function MultiSelect({
     const searchLower = search.toLowerCase();
     return options.filter(option => option.label.toLowerCase().includes(searchLower));
   }, [options, search]);
+
+  const canAddCustom = React.useMemo(() => {
+    const trimmed = search.trim();
+    if (!trimmed) return false;
+    const existsInOptions = options.some(o => o.value === trimmed || o.label === trimmed);
+    const alreadySelected = value.includes(trimmed);
+    return !existsInOptions && !alreadySelected;
+  }, [search, options, value]);
+
+  const addCustom = () => {
+    const trimmed = search.trim();
+    if (!trimmed) return;
+    if (value.includes(trimmed)) return;
+    onValueChange?.([...value, trimmed]);
+    setSearch("");
+    setOpen(false);
+  };
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -122,6 +143,15 @@ export function MultiSelect({
                   </CommandItem>
                 );
               })}
+              {canAddCustom && (
+                <CommandItem
+                  key="__add_custom__"
+                  onSelect={addCustom}
+                  className="cursor-pointer text-emerald-500"
+                >
+                  Add "{search.trim()}"
+                </CommandItem>
+              )}
             </CommandGroup>
           </CommandList>
         </Command>

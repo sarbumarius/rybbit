@@ -67,8 +67,38 @@ export async function getFunnel(
       timeZone,
     });
 
+    // Build filter conditions, supporting special session-level tokens like #fbclid# on pathname
+    let sessionTokens: string[] = [];
+    const normalFilters = (filters || []).map(f => ({ ...f })).map(f => {
+      if (f.parameter === "pathname" && Array.isArray(f.value) && f.value.length > 0) {
+        const remaining: string[] = [];
+        for (const val of f.value) {
+          const m = typeof val === "string" ? val.match(/^#(.+?)#$/) : null;
+          if (m) {
+            sessionTokens.push(m[1]);
+          } else {
+            remaining.push(val as any);
+          }
+        }
+        return { ...f, value: remaining } as any;
+      }
+      return f as any;
+    }).filter(f => !(f.parameter === "pathname" && Array.isArray(f.value) && f.value.length === 0));
+
     // Get filter conditions using the existing utility function
-    const filterConditions = filters && filters.length > 0 ? getFilterStatement(JSON.stringify(filters)) : "";
+    const filterConditions = normalFilters && normalFilters.length > 0 ? getFilterStatement(JSON.stringify(normalFilters)) : "";
+
+    // Session-level clause for special tokens (search across the whole session for token presence)
+    const sessionTokenClause = sessionTokens.length > 0
+      ? `AND session_id IN (
+          SELECT DISTINCT session_id FROM events
+          WHERE site_id = {siteId:Int32}
+            ${timeStatement}
+            AND (${sessionTokens
+              .map(t => `has(url_parameters, ${SqlString.escape(t)}) OR pathname LIKE ${SqlString.escape('%' + t + '%')} OR referrer LIKE ${SqlString.escape('%' + t + '%')}`)
+              .join(" OR ")})
+        )`
+      : "";
 
     // Build conditional statements for each step
     const stepConditions = steps.map(step => {
@@ -120,6 +150,7 @@ export async function getFunnel(
         site_id = {siteId:Int32}
         ${timeStatement}
         ${filterConditions}
+        ${sessionTokenClause}
         AND user_id != ''
     ),
     -- Initial step (all users who completed step 1)
@@ -221,6 +252,7 @@ export async function getFunnel(
         site_id = {siteId:Int32}
         ${timeStatement}
         ${filterConditions}
+        ${sessionTokenClause}
         AND user_id != ''
     ),
     Step1 AS (

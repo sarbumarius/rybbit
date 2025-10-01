@@ -5,32 +5,32 @@ import { filterParamSchema, validateFilters, validateTimeStatementParams } from 
 import { FilterParameter, FilterType } from "./types.js";
 
 export function getTimeStatement(
-    params: Pick<FilterParams, "startDate" | "endDate" | "timeZone" | "pastMinutesStart" | "pastMinutesEnd">
+  params: Pick<FilterParams, "startDate" | "endDate" | "timeZone" | "pastMinutesStart" | "pastMinutesEnd">
 ) {
-    const { startDate, endDate, timeZone, pastMinutesStart, pastMinutesEnd } = params;
+  const { startDate, endDate, timeZone, pastMinutesStart, pastMinutesEnd } = params;
 
-    // Construct the legacy format for validation
-    const pastMinutesRange =
-        pastMinutesStart !== undefined && pastMinutesEnd !== undefined
-            ? { start: Number(pastMinutesStart), end: Number(pastMinutesEnd) }
-            : undefined;
+  // Construct the legacy format for validation
+  const pastMinutesRange =
+    pastMinutesStart !== undefined && pastMinutesEnd !== undefined
+      ? { start: Number(pastMinutesStart), end: Number(pastMinutesEnd) }
+      : undefined;
 
-    const date = startDate && endDate && timeZone ? { startDate, endDate, timeZone } : undefined;
+  const date = startDate && endDate && timeZone ? { startDate, endDate, timeZone } : undefined;
 
-    // Sanitize inputs with Zod
-    const sanitized = validateTimeStatementParams({
-        date,
-        pastMinutesRange,
-    });
+  // Sanitize inputs with Zod
+  const sanitized = validateTimeStatementParams({
+    date,
+    pastMinutesRange,
+  });
 
-    if (sanitized.date) {
-        const { startDate, endDate, timeZone } = sanitized.date;
-        if (!startDate && !endDate) {
-            return "";
-        }
+  if (sanitized.date) {
+    const { startDate, endDate, timeZone } = sanitized.date;
+    if (!startDate && !endDate) {
+      return "";
+    }
 
-        // Use SqlString.escape for date and timeZone values
-        return `AND timestamp >= toTimeZone(
+    // Use SqlString.escape for date and timeZone values
+    return `AND timestamp >= toTimeZone(
       toStartOfDay(toDateTime(${SqlString.escape(startDate)}, ${SqlString.escape(timeZone)})),
       'UTC'
       )
@@ -42,123 +42,123 @@ export function getTimeStatement(
           'UTC'
         )
       )`;
-    }
+  }
 
-    // Handle specific range of past minutes - convert to exact timestamps for better performance
-    if (sanitized.pastMinutesRange) {
-        const { start, end } = sanitized.pastMinutesRange;
+  // Handle specific range of past minutes - convert to exact timestamps for better performance
+  if (sanitized.pastMinutesRange) {
+    const { start, end } = sanitized.pastMinutesRange;
 
-        // Calculate exact timestamps in JavaScript to avoid runtime ClickHouse calculations
-        const now = new Date();
-        const startTimestamp = new Date(now.getTime() - start * 60 * 1000);
-        const endTimestamp = new Date(now.getTime() - end * 60 * 1000);
+    // Calculate exact timestamps in JavaScript to avoid runtime ClickHouse calculations
+    const now = new Date();
+    const startTimestamp = new Date(now.getTime() - start * 60 * 1000);
+    const endTimestamp = new Date(now.getTime() - end * 60 * 1000);
 
-        // Format as YYYY-MM-DD HH:MM:SS without milliseconds for ClickHouse
-        const startIso = startTimestamp.toISOString().slice(0, 19).replace("T", " ");
-        const endIso = endTimestamp.toISOString().slice(0, 19).replace("T", " ");
+    // Format as YYYY-MM-DD HH:MM:SS without milliseconds for ClickHouse
+    const startIso = startTimestamp.toISOString().slice(0, 19).replace("T", " ");
+    const endIso = endTimestamp.toISOString().slice(0, 19).replace("T", " ");
 
-        return `AND timestamp > toDateTime(${SqlString.escape(startIso)}) AND timestamp <= toDateTime(${SqlString.escape(endIso)})`;
-    }
+    return `AND timestamp > toDateTime(${SqlString.escape(startIso)}) AND timestamp <= toDateTime(${SqlString.escape(endIso)})`;
+  }
 
-    // If no valid time parameters were provided, return empty string
-    return "";
+  // If no valid time parameters were provided, return empty string
+  return "";
 }
 
 export async function processResults<T>(results: ResultSet<"JSONEachRow">): Promise<T[]> {
-    const data: T[] = await results.json();
-    for (const row of data) {
-        for (const key in row) {
-            // Only convert to number if the value is not null/undefined and is a valid number
-            if (
-                key !== "session_id" &&
-                key !== "user_id" &&
-                row[key] !== null &&
-                row[key] !== undefined &&
-                row[key] !== "" &&
-                !isNaN(Number(row[key]))
-            ) {
-                row[key] = Number(row[key]) as any;
-            }
-        }
+  const data: T[] = await results.json();
+  for (const row of data) {
+    for (const key in row) {
+      // Only convert to number if the value is not null/undefined and is a valid number
+      if (
+        key !== "session_id" &&
+        key !== "user_id" &&
+        row[key] !== null &&
+        row[key] !== undefined &&
+        row[key] !== "" &&
+        !isNaN(Number(row[key]))
+      ) {
+        row[key] = Number(row[key]) as any;
+      }
     }
-    return data;
+  }
+  return data;
 }
 
 const filterTypeToOperator = (type: FilterType) => {
-    switch (type) {
-        case "equals":
-            return "=";
-        case "not_equals":
-            return "!=";
-        case "contains":
-            return "LIKE";
-        case "not_contains":
-            return "NOT LIKE";
-    }
+  switch (type) {
+    case "equals":
+      return "=";
+    case "not_equals":
+      return "!=";
+    case "contains":
+      return "LIKE";
+    case "not_contains":
+      return "NOT LIKE";
+  }
 };
 
 export const getSqlParam = (parameter: FilterParameter) => {
-    // Handle URL parameters through the url_parameters map
-    if (parameter.startsWith("utm_") || parameter.startsWith("url_param:")) {
-        // For explicit url_param: prefix (e.g., url_param:campaign_id)
-        if (parameter.startsWith("url_param:")) {
-            const paramName = parameter.substring("url_param:".length);
-            return `url_parameters['${paramName}']`;
-        }
-
-        const utm = parameter; // e.g., utm_source, utm_medium, etc.
-        return `url_parameters['${utm}']`;
+  // Handle URL parameters through the url_parameters map
+  if (parameter.startsWith("utm_") || parameter.startsWith("url_param:")) {
+    // For explicit url_param: prefix (e.g., url_param:campaign_id)
+    if (parameter.startsWith("url_param:")) {
+      const paramName = parameter.substring("url_param:".length);
+      return `url_parameters['${paramName}']`;
     }
 
-    if (parameter === "referrer") {
-        return "domainWithoutWWW(referrer)";
-    }
-    if (parameter === "entry_page") {
-        return "(SELECT argMin(pathname, timestamp) FROM events WHERE session_id = events.session_id)";
-    }
-    if (parameter === "exit_page") {
-        return "(SELECT argMax(pathname, timestamp) FROM events WHERE session_id = events.session_id)";
-    }
-    if (parameter === "dimensions") {
-        return "concat(toString(screen_width), 'x', toString(screen_height))";
-    }
-    if (parameter === "city") {
-        return "concat(toString(region), '-', toString(city))";
-    }
-    if (parameter === "browser_version") {
-        return "concat(toString(browser), ' ', toString(browser_version))";
-    }
-    if (parameter === "operating_system_version") {
-        return `CASE 
+    const utm = parameter; // e.g., utm_source, utm_medium, etc.
+    return `url_parameters['${utm}']`;
+  }
+
+  if (parameter === "referrer") {
+    return "domainWithoutWWW(referrer)";
+  }
+  if (parameter === "entry_page") {
+    return "(SELECT argMin(pathname, timestamp) FROM events WHERE session_id = events.session_id)";
+  }
+  if (parameter === "exit_page") {
+    return "(SELECT argMax(pathname, timestamp) FROM events WHERE session_id = events.session_id)";
+  }
+  if (parameter === "dimensions") {
+    return "concat(toString(screen_width), 'x', toString(screen_height))";
+  }
+  if (parameter === "city") {
+    return "concat(toString(region), '-', toString(city))";
+  }
+  if (parameter === "browser_version") {
+    return "concat(toString(browser), ' ', toString(browser_version))";
+  }
+  if (parameter === "operating_system_version") {
+    return `CASE 
       WHEN concat(toString(operating_system), ' ', toString(operating_system_version)) = 'Windows 10' 
       THEN 'Windows 10/11' 
       ELSE concat(toString(operating_system), ' ', toString(operating_system_version)) 
     END`;
-    }
-    return filterParamSchema.parse(parameter);
+  }
+  return filterParamSchema.parse(parameter);
 };
 
 export function getFilterStatement(filters: string) {
-    if (!filters) {
-        return "";
-    }
+  if (!filters) {
+    return "";
+  }
 
-    // Sanitize inputs with Zod
-    const filtersArray = validateFilters(filters);
+  // Sanitize inputs with Zod
+  const filtersArray = validateFilters(filters);
 
-    if (filtersArray.length === 0) {
-        return "";
-    }
+  if (filtersArray.length === 0) {
+    return "";
+  }
 
-    return (
-        "AND " +
-        filtersArray
-            .map(filter => {
-                const x = filter.type === "contains" || filter.type === "not_contains" ? "%" : "";
+  return (
+    "AND " +
+    filtersArray
+      .map(filter => {
+        const x = filter.type === "contains" || filter.type === "not_contains" ? "%" : "";
 
-                if (filter.parameter === "entry_page") {
-                    if (filter.value.length === 1) {
-                        return `session_id IN (
+        if (filter.parameter === "entry_page") {
+          if (filter.value.length === 1) {
+            return `session_id IN (
               SELECT session_id 
               FROM (
                 SELECT 
@@ -169,13 +169,13 @@ export function getFilterStatement(filters: string) {
               ) 
               WHERE entry_pathname ${filterTypeToOperator(filter.type)} ${SqlString.escape(x + filter.value[0] + x)}
             )`;
-                    }
+          }
 
-                    const valuesWithOperator = filter.value.map(
-                        value => `entry_pathname ${filterTypeToOperator(filter.type)} ${SqlString.escape(x + value + x)}`
-                    );
+          const valuesWithOperator = filter.value.map(
+            value => `entry_pathname ${filterTypeToOperator(filter.type)} ${SqlString.escape(x + value + x)}`
+          );
 
-                    return `session_id IN (
+          return `session_id IN (
             SELECT session_id 
             FROM (
               SELECT 
@@ -186,11 +186,11 @@ export function getFilterStatement(filters: string) {
             ) 
             WHERE (${valuesWithOperator.join(" OR ")})
           )`;
-                }
+        }
 
-                if (filter.parameter === "exit_page") {
-                    if (filter.value.length === 1) {
-                        return `session_id IN (
+        if (filter.parameter === "exit_page") {
+          if (filter.value.length === 1) {
+            return `session_id IN (
               SELECT session_id 
               FROM (
                 SELECT 
@@ -201,13 +201,13 @@ export function getFilterStatement(filters: string) {
               ) 
               WHERE exit_pathname ${filterTypeToOperator(filter.type)} ${SqlString.escape(x + filter.value[0] + x)}
             )`;
-                    }
+          }
 
-                    const valuesWithOperator = filter.value.map(
-                        value => `exit_pathname ${filterTypeToOperator(filter.type)} ${SqlString.escape(x + value + x)}`
-                    );
+          const valuesWithOperator = filter.value.map(
+            value => `exit_pathname ${filterTypeToOperator(filter.type)} ${SqlString.escape(x + value + x)}`
+          );
 
-                    return `session_id IN (
+          return `session_id IN (
             SELECT session_id 
             FROM (
               SELECT 
@@ -218,23 +218,23 @@ export function getFilterStatement(filters: string) {
             ) 
             WHERE (${valuesWithOperator.join(" OR ")})
           )`;
-                }
+        }
 
-                if (filter.value.length === 1) {
-                    return `${getSqlParam(filter.parameter)} ${filterTypeToOperator(
-                        filter.type
-                    )} ${SqlString.escape(x + filter.value[0] + x)}`;
-                }
+        if (filter.value.length === 1) {
+          return `${getSqlParam(filter.parameter)} ${filterTypeToOperator(
+            filter.type
+          )} ${SqlString.escape(x + filter.value[0] + x)}`;
+        }
 
-                const valuesWithOperator = filter.value.map(
-                    value =>
-                        `${getSqlParam(filter.parameter)} ${filterTypeToOperator(filter.type)} ${SqlString.escape(x + value + x)}`
-                );
+        const valuesWithOperator = filter.value.map(
+          value =>
+            `${getSqlParam(filter.parameter)} ${filterTypeToOperator(filter.type)} ${SqlString.escape(x + value + x)}`
+        );
 
-                return `(${valuesWithOperator.join(" OR ")})`;
-            })
-            .join(" AND ")
-    );
+        return `(${valuesWithOperator.join(" OR ")})`;
+      })
+      .join(" AND ")
+  );
 }
 
 /**
@@ -245,58 +245,49 @@ export function getFilterStatement(filters: string) {
  * @returns ClickHouse-compatible regex string
  */
 export function patternToRegex(pattern: string): string {
-    // Detect special triple-star ("***") which we treat as a generic "contains" wildcard
-    const hasTriple = pattern.includes("***");
+  // Support triple-star contains markers ***...*** to mean substring contains
+  // Detect sequences like ***something*** and translate to ".*something.*" without anchors
+  const tripleStarRegex = /\*\*\*(.*?)\*\*\*/g;
+  if (tripleStarRegex.test(pattern)) {
+    // Replace each ***inner*** with .*inner.*
+    const replaced = pattern.replace(tripleStarRegex, (_, inner) => `.*${inner}.*`);
 
-    // Escape special regex characters except * which we'll handle specially
-    // We first replace *** with a marker so we can safely escape the rest and restore later
-    const TRIPLE_MARK = "{{TRIPLE_STAR}}";
-    const escapedPattern = pattern
-        .replace(/\*\*\*/g, TRIPLE_MARK)
-        .replace(/[.+?^${}()|[\]\\]/g, "\\$&");
+    // Escape other regex metacharacters (do not escape the injected ".*inner.*")
+    const escaped = replaced.replace(/[.+?^${}()|[\]\\]/g, "\\$&");
+    // Restore our injected wildcard fragments which got escaped above
+    const finalRegex = escaped.replace(/\\\.\\\*([^\\]+)\\\.\\\*/g, ".*$1.*");
+    return `${finalRegex}`; // no anchors => contains
+  }
 
-    // Replace ** with a temporary marker
-    const withDoubleStar = escapedPattern.replace(/\*\*/g, "{{DOUBLE_STAR}}");
-
-    // Replace * with [^/]+ (any characters except /)
-    const withSingleStar = withDoubleStar.replace(/\*/g, "[^/]+");
-
-    // Replace the double star marker with .* (any characters including /)
-    let finalRegex = withSingleStar.replace(/{{DOUBLE_STAR}}/g, ".*");
-
-    // Replace triple-star marker with .* as well
-    finalRegex = finalRegex.replace(new RegExp(TRIPLE_MARK, "g"), ".*");
-
-    // If triple-star was used anywhere, treat this as a "contains" pattern and do not anchor
-    if (hasTriple) {
-        return `${finalRegex}`;
-    }
-
-    // Otherwise, anchor the regex to start/end of string for exact matches
-    return `^${finalRegex}$`;
+  // Classic wildcard behavior for * and ** on pathnames
+  const escapedPattern = pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&");
+  const withDoubleStar = escapedPattern.replace(/\*\*/g, "{{DOUBLE_STAR}}");
+  const withSingleStar = withDoubleStar.replace(/\*/g, "[^/]+");
+  const finalRegex = withSingleStar.replace(/{{DOUBLE_STAR}}/g, ".*");
+  return `^${finalRegex}$`;
 }
 
 // Time bucket mapping constants
 export const TimeBucketToFn = {
-    minute: "toStartOfMinute",
-    five_minutes: "toStartOfFiveMinutes",
-    ten_minutes: "toStartOfTenMinutes",
-    fifteen_minutes: "toStartOfFifteenMinutes",
-    hour: "toStartOfHour",
-    day: "toStartOfDay",
-    week: "toStartOfWeek",
-    month: "toStartOfMonth",
-    year: "toStartOfYear",
+  minute: "toStartOfMinute",
+  five_minutes: "toStartOfFiveMinutes",
+  ten_minutes: "toStartOfTenMinutes",
+  fifteen_minutes: "toStartOfFifteenMinutes",
+  hour: "toStartOfHour",
+  day: "toStartOfDay",
+  week: "toStartOfWeek",
+  month: "toStartOfMonth",
+  year: "toStartOfYear",
 } as const;
 
 export const bucketIntervalMap = {
-    minute: "1 MINUTE",
-    five_minutes: "5 MINUTES",
-    ten_minutes: "10 MINUTES",
-    fifteen_minutes: "15 MINUTES",
-    hour: "1 HOUR",
-    day: "1 DAY",
-    week: "7 DAY",
-    month: "1 MONTH",
-    year: "1 YEAR",
+  minute: "1 MINUTE",
+  five_minutes: "5 MINUTES",
+  ten_minutes: "10 MINUTES",
+  fifteen_minutes: "15 MINUTES",
+  hour: "1 HOUR",
+  day: "1 DAY",
+  week: "7 DAY",
+  month: "1 MONTH",
+  year: "1 YEAR",
 } as const;

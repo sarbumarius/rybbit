@@ -11,37 +11,28 @@ import { getStartAndEndDate } from "../../../../api/utils";
 import { Filter } from "@rybbit/shared";
 import { FunnelForm } from "./FunnelForm";
 
-interface EditFunnelDialogProps {
-  funnel: SavedFunnel;
+interface DuplicateFunnelDialogProps {
+  source: SavedFunnel;
   isOpen: boolean;
   onClose: () => void;
 }
 
-export function EditFunnelDialog({ funnel, isOpen, onClose }: EditFunnelDialogProps) {
-  // Time state - initialized to today by default
+export function DuplicateFunnelDialog({ source, isOpen, onClose }: DuplicateFunnelDialogProps) {
+  // Time state - initialized to today
   const [time, setTime] = useState<Time>({
     mode: "day",
     day: DateTime.now().toISODate(),
   });
 
-  // Funnel steps state - initialized from funnel
-  const [steps, setSteps] = useState<FunnelStep[]>(funnel.steps);
-
-  // Funnel filters state - initialized from funnel
-  const [filters, setFilters] = useState<Filter[]>(funnel.filters || []);
-
-  // Funnel name - initialized from funnel
-  const [name, setName] = useState(funnel.name);
+  // Steps/filters/name initialized from source funnel
+  const [steps, setSteps] = useState<FunnelStep[]>(source.steps);
+  const [filters, setFilters] = useState<Filter[]>(source.filters || []);
+  const [name, setName] = useState(`${source.name} (copy)`);
 
   const { startDate, endDate } = getStartAndEndDate(time);
 
-  // Funnel analysis query
-  const {
-    data,
-    isError,
-    error,
-    isLoading: isPending,
-  } = useGetFunnel(
+  // Preview query for visualization
+  const { data, isError, error, isLoading: isPending } = useGetFunnel(
     {
       steps,
       startDate,
@@ -51,12 +42,9 @@ export function EditFunnelDialog({ funnel, isOpen, onClose }: EditFunnelDialogPr
     true
   );
 
-  // Funnel save mutation
   const { mutate: saveFunnel, isPending: isSaving, error: saveError } = useSaveFunnel();
 
-  // Query funnel without saving
   const handleQueryFunnel = () => {
-    // Validate steps have values
     const hasEmptySteps = steps.some(step => !step.value);
     if (hasEmptySteps) {
       alert("All steps must have values");
@@ -64,85 +52,70 @@ export function EditFunnelDialog({ funnel, isOpen, onClose }: EditFunnelDialogPr
     }
   };
 
-  // Update funnel
-  const handleUpdateFunnel = () => {
-    // Validate name
+  const handleCreateDuplicate = () => {
+    // Validate
     if (!name.trim()) {
       alert("Please enter a funnel name");
       return;
     }
-
-    // Validate steps have values
     const hasEmptySteps = steps.some(step => !step.value);
     if (hasEmptySteps) {
       alert("All steps must have values");
       return;
     }
 
-    // Get dates based on time selection
-    let startDate = "",
-      endDate = "";
-
+    // Determine dates from selected time
+    let s = "", e = "";
     if (time.mode === "range") {
-      startDate = time.startDate;
-      endDate = time.endDate;
+      s = time.startDate; e = time.endDate;
     } else if (time.mode === "day") {
-      startDate = time.day;
-      endDate = time.day;
+      s = time.day; e = time.day;
     } else if (time.mode === "week") {
-      startDate = time.week;
-      const endDateValue = DateTime.fromISO(time.week).plus({ days: 6 }).toISODate();
-      endDate = endDateValue || DateTime.now().toISODate();
+      s = time.week; e = DateTime.fromISO(time.week).plus({ days: 6 }).toISODate() || DateTime.now().toISODate();
     } else if (time.mode === "month") {
-      startDate = time.month;
-      const endDateValue = DateTime.fromISO(time.month).endOf("month").toISODate();
-      endDate = endDateValue || DateTime.now().toISODate();
+      s = time.month; e = DateTime.fromISO(time.month).endOf("month").toISODate() || DateTime.now().toISODate();
     } else if (time.mode === "year") {
-      startDate = time.year;
-      const endDateValue = DateTime.fromISO(time.year).endOf("year").toISODate();
-      endDate = endDateValue || DateTime.now().toISODate();
+      s = time.year; e = DateTime.fromISO(time.year).endOf("year").toISODate() || DateTime.now().toISODate();
     } else {
-      // Fall back to last 7 days for all-time
-      startDate = DateTime.now().minus({ days: 7 }).toISODate();
-      endDate = DateTime.now().toISODate();
+      s = DateTime.now().minus({ days: 7 }).toISODate();
+      e = DateTime.now().toISODate();
     }
 
-    // Update funnel with the report ID
+    // Create new funnel (no reportId)
     saveFunnel(
       {
         steps,
-        startDate,
-        endDate,
+        startDate: s,
+        endDate: e,
         name,
-        reportId: funnel.id,
         filters: filters.length > 0 ? filters : undefined,
       },
       {
         onSuccess: () => {
-          // Close dialog on successful save
           onClose();
-          // Show success message
-          toast?.success("Funnel updated successfully");
+          toast?.success("Funnel duplicated successfully");
         },
-        onError: error => {
-          // Show error but don't close dialog
-          toast?.error(`Failed to update funnel: ${error.message}`);
+        onError: (err) => {
+          toast?.error(`Failed to duplicate funnel: ${err.message}`);
         },
       }
     );
   };
 
-  // Load existing funnel data on first render
+  // Reset local state when the dialog opens with a (possibly) new source
   useEffect(() => {
-    // Pre-load the funnel visualization
-    handleQueryFunnel();
-  }, []);
+    if (isOpen) {
+      setSteps(source.steps);
+      setFilters(source.filters || []);
+      setName(`${source.name} (copy)`);
+    }
+  }, [isOpen, source]);
 
   return (
     <Dialog open={isOpen} onOpenChange={open => !open && onClose()}>
       <DialogContent className="max-w-[95vw] max-h-[95vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Edit Funnel</DialogTitle>
+          <DialogTitle>Duplicate Funnel</DialogTitle>
         </DialogHeader>
 
         <FunnelForm
@@ -154,10 +127,10 @@ export function EditFunnelDialog({ funnel, isOpen, onClose }: EditFunnelDialogPr
           setTime={setTime}
           filters={filters}
           setFilters={setFilters}
-          onSave={handleUpdateFunnel}
+          onSave={handleCreateDuplicate}
           onCancel={onClose}
           onQuery={handleQueryFunnel}
-          saveButtonText="Update Funnel"
+          saveButtonText="Create Funnel"
           isSaving={isSaving}
           isError={isError}
           isPending={isPending}
